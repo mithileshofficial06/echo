@@ -111,13 +111,17 @@ export async function submitRun(
 
 export async function fetchTop(day: string, limit = 20): Promise<LeaderboardEntry[]> {
   if (!online) {
-    return readLocal()
-      .filter((r) => r.day === day)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit);
+    // Best run per name, like the online leaderboard view.
+    const best = new Map<string, LocalRun>();
+    for (const r of readLocal()) {
+      if (r.day !== day) continue;
+      const cur = best.get(r.name);
+      if (!cur || r.score > cur.score) best.set(r.name, r);
+    }
+    return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit);
   }
   const url =
-    `${SUPABASE_URL}/rest/v1/runs?select=id,name,score,loops,orbs,max_combo,day,created_at,verified` +
+    `${SUPABASE_URL}/rest/v1/leaderboard?select=id,name,score,loops,orbs,max_combo,day,created_at,verified` +
     `&day=eq.${encodeURIComponent(day)}&order=score.desc,created_at.asc&limit=${limit}`;
   const res = await fetch(url, { headers: headers() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
