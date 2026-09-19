@@ -15,10 +15,21 @@ export interface GameResult {
 
 export interface GameOptions {
   seed: number;
-  /** When set, the game plays back these inputs instead of reading the player. */
-  replay?: Uint8Array;
-  replayLabel?: string;
+  /** Input source. Defaults to the player's keyboard/touch. */
+  source?: (sim: Sim) => number;
+  /** Hide the touch joystick (replays, attract mode). */
+  hideJoystick?: boolean;
+  /** No music or sfx (menu background). */
+  silent?: boolean;
+  /** Replaces the "SCORE" HUD label, e.g. "REPLAY · NAME". */
+  label?: string;
+  onEvent?: (e: SimEvent, sim: Sim) => void;
   onOver: (result: GameResult) => void;
+}
+
+/** Plays back a recorded input log. */
+export function replaySource(inputs: Uint8Array): (sim: Sim) => number {
+  return (sim) => inputs[sim.tick] ?? 0;
 }
 
 const DEATH_SLOWMO_MS = 1600;
@@ -29,37 +40,35 @@ export class Game {
   private log = new InputLog();
   private acc = 0;
   private dyingFor = 0;
-  private replayIdx = 0;
   state: GameState = "running";
   /** Replay playback speed multiplier. */
   speed = 1;
 
+  private sound: Sound | null;
+
   constructor(
     private renderer: Renderer,
     private input: Input,
-    private sound: Sound,
+    sound: Sound,
     private opts: GameOptions,
   ) {
     this.sim = new Sim(opts.seed);
+    this.sound = opts.silent ? null : sound;
     this.fx.banner("LOOP 01", "#fff", 44, 70);
-    sound.startLoop(0);
-  }
-
-  get isReplay(): boolean {
-    return !!this.opts.replay;
+    this.sound?.startLoop(0);
   }
 
   pause() {
     if (this.state !== "running") return;
     this.state = "paused";
-    this.sound.pause();
+    this.sound?.pause();
   }
 
   resume() {
     if (this.state !== "paused") return;
     this.state = "running";
     this.acc = 0;
-    this.sound.resume();
+    this.sound?.resume();
   }
 
   frame(dtMs: number, time: number) {
@@ -82,55 +91,80 @@ export class Game {
     }
 
     this.input.rotated = this.renderer.rotated;
-    this.renderer.draw(this.sim, this.fx, this.isReplay ? null : this.input.joy, {
+    this.renderer.draw(this.sim, this.fx, this.opts.hideJoystick ? null : this.input.joy, {
       alpha: this.state === "running" ? this.acc / TICK_MS : 1,
       time,
       hud: true,
-      label: this.opts.replayLabel,
+      label: this.opts.label,
     });
   }
 
   private tick() {
-    let input: number;
-    if (this.opts.replay) {
-      input = this.opts.replay[this.replayIdx++] ?? 0;
-    } else {
-      input = this.input.read();
-    }
+    const input = this.opts.source ? this.opts.source(this.sim) : this.input.read();
     this.log.push(input);
     const events = this.sim.step(input);
-    for (const e of events) this.onEvent(e);
-
-    // A replay that runs out of inputs without a death (shouldn't happen) just ends.
-    if (this.opts.replay && this.replayIdx >= this.opts.replay.length && !this.sim.dead) {
-      this.state = "over";
-      this.sound.stopMusic();
-      this.opts.onOver({ sim: this.sim, inputs: this.log.toArray() });
+    for (const e of events) {
+      this.onEvent(e);
+      this.opts.onEvent?.(e, this.sim);
     }
   }
 
+  /** Stop without a game-over callback (quit to menu). */
+  stop() {
+    this.state = "over";
+    this.sound?.stopMusic();
+  }
+
   private onEvent(e: SimEvent) {
-    const fx = this.fx;
+    this.onEventVisual(e);
     const s = this.sound;
+    if (!s) return;
+    switch (e.type) {
+      case "orb":
+        s.orb(e.combo);
+        break;
+      case "quotaMet":
+        s.quota();
+        break;
+      case "graze":
+        s.graze(e.combo);
+        break;
+      case "comboLost":
+        s.comboLost();
+        break;
+      case "forget":
+        s.forget();
+        s.setLayers(this.sim.activeGhosts.length);
+        break;
+      case "loop":
+        s.loop();
+        s.startLoop(this.sim.activeGhosts.length);
+        break;
+      case "death":
+        s.stopMusic(true);
+        if (e.cause === "collision") s.death();
+        else s.fade();
+        break;
+    }
+  }
+
+  private onEventVisual(e: SimEvent) {
+    const fx = this.fx;
     switch (e.type) {
       case "orb":
         fx.burst(e.x, e.y, "#fff", 18, 3.5, 36);
         fx.popup(`+${e.points}`, e.x, e.y - 14, "#fff", 13);
         fx.addShake(2);
-        s.orb(e.combo);
         break;
       case "quotaMet":
         fx.popup("SAFE", this.sim.px, this.sim.py - 32, ACCENT, 12, 60);
-        s.quota();
         break;
       case "graze":
         fx.burst(e.x, e.y, ACCENT, 10, 2.5, 28, 2);
         fx.popup(`SYNC x${e.combo}`, e.x, e.y - 20, ACCENT, 12 + Math.min(e.combo, 10), 45);
-        s.graze(e.combo);
         break;
       case "comboLost":
         if (e.combo >= 3) fx.popup(`x${e.combo} LOST`, this.sim.px, this.sim.py - 24, "#6b6b6b", 11);
-        s.comboLost();
         break;
       case "forget": {
         const [x, y] = this.renderer.ghostRenderPos(this.sim, e.ghost, 1);
@@ -138,25 +172,19 @@ export class Game {
         fx.banner("MEMORY LOST", ACCENT, 38, 60);
         fx.addShake(8);
         fx.addFlash(0.4, ACCENT);
-        s.forget();
-        s.setLayers(this.sim.activeGhosts.length);
         break;
       }
-      case "loop": {
+      case "loop":
         fx.banner(`LOOP ${String(e.loop).padStart(2, "0")}`, "#fff", 44, 70);
         fx.popup(`+${e.bonus}`, this.sim.px, this.sim.py - 26, ACCENT, 14, 60);
         if (e.charged) fx.popup("FORGET +1", this.sim.px, this.sim.py + 30, "#fff", 12, 70);
         fx.addFlash(0.35, ACCENT);
         // Echoes materialize at their starting points.
         for (const g of this.sim.activeGhosts) fx.burst(g.path[0], g.path[1], ACCENT, 14, 2, 30, 2);
-        s.loop();
-        s.startLoop(this.sim.activeGhosts.length);
         break;
-      }
       case "death":
         this.state = "dying";
         this.dyingFor = 0;
-        s.stopMusic(true);
         if (e.cause === "collision") {
           fx.burst(e.x, e.y, "#fff", 50, 6, 70, 3);
           fx.burst(e.x, e.y, DANGER, 40, 4, 80, 3);
@@ -165,13 +193,11 @@ export class Game {
           fx.glitch = 1;
           const loop = e.ghost ? String(e.ghost.loop).padStart(2, "0") : "??";
           fx.banner(`LOOP ${loop} GOT YOU`, DANGER, 34, 200);
-          s.death();
         } else {
           fx.dissolve(e.x, e.y, "#fff");
           fx.dissolve(e.x, e.y, "#fff");
           fx.banner("NOT ENOUGH ORBS", DANGER, 32, 200);
           fx.glitch = 0.5;
-          s.fade();
         }
         break;
     }
