@@ -9,7 +9,7 @@ export interface TapestryInfo {
 }
 
 const W = 1200;
-const H = 1000;
+const H = 1110;
 
 /** Memory number: stable for a given run, so the same run always gets the same ID. */
 export function memoryId(sim: Sim): string {
@@ -129,7 +129,7 @@ export function renderTapestry(sim: Sim, info: TapestryInfo): HTMLCanvasElement 
   c.fillStyle = "#6b6b6b";
   c.font = `400 18px ${FONT}`;
   const footer = info.name ? `${info.name} · every move comes back to haunt you` : "every move comes back to haunt you";
-  c.fillText(footer, 60, H - 56);
+  c.fillText(footer, 60, H - 50);
 
   return canvas;
 }
