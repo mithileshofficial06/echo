@@ -192,8 +192,11 @@ class App {
     this.setLayer(null);
 
     const tutorial = this.runsPlayed < 2;
+    // Dev-only: ?bot lets the attract bot play a real run (for testing late loops).
+    const devBot = import.meta.env.DEV && new URLSearchParams(location.search).has("bot");
     this.game = new Game(renderer, input, sound, {
       seed,
+      source: devBot ? createBot() : undefined,
       onEvent: (e, sim) => this.onGameEvent(e, sim, tutorial),
       onOver: (r) => this.showGameOver(r),
     });
