@@ -35,6 +35,8 @@ export class Input {
     if (window.matchMedia("(pointer: coarse)").matches) this.markTouch();
     window.addEventListener("touchstart", () => this.markTouch(), { passive: true });
     window.addEventListener("keydown", (e) => {
+      // Never steal keys from text fields (e.g. typing a name with W/A/S/D in it).
+      if (e.target instanceof HTMLInputElement) return;
       if ([...KEY_UP, ...KEY_DOWN, ...KEY_LEFT, ...KEY_RIGHT, "Space"].includes(e.code)) {
         e.preventDefault();
       }
