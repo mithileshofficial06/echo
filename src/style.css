@@ -207,6 +207,10 @@ button:disabled {
   justify-content: center;
 }
 
+body.touch .keys {
+  display: none;
+}
+
 .meta b {
   color: var(--fg);
 }

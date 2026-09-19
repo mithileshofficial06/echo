@@ -32,6 +32,8 @@ export class Input {
   rotated = false;
 
   constructor(private forgetButton: HTMLElement) {
+    if (window.matchMedia("(pointer: coarse)").matches) this.markTouch();
+    window.addEventListener("touchstart", () => this.markTouch(), { passive: true });
     window.addEventListener("keydown", (e) => {
       if ([...KEY_UP, ...KEY_DOWN, ...KEY_LEFT, ...KEY_RIGHT, "Space"].includes(e.code)) {
         e.preventDefault();
@@ -59,10 +61,14 @@ export class Input {
 
   private onDown(e: PointerEvent) {
     if (e.pointerType === "mouse" || this.joyId !== null) return;
-    this.touchUsed = true;
-    document.body.classList.add("touch");
+    this.markTouch();
     this.joyId = e.pointerId;
     Object.assign(this.joy, { active: true, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
+  }
+
+  private markTouch() {
+    this.touchUsed = true;
+    document.body.classList.add("touch");
   }
 
   private onMove(e: PointerEvent) {
