@@ -14,6 +14,7 @@ import {
   LOOP_TICKS,
   ORB_MARGIN,
   ORB_MIN_DIST_FROM_PLAYER,
+  ORB_PICKUP_BONUS,
   ORB_RADIUS,
   PLAYER_RADIUS,
   PLAYER_SPEED,
@@ -159,7 +160,7 @@ export class Sim {
     this.currentPath[this.loopTick * 2 + 1] = this.py;
 
     // Orbs
-    const pickR = PLAYER_RADIUS + ORB_RADIUS;
+    const pickR = PLAYER_RADIUS + ORB_RADIUS + ORB_PICKUP_BONUS;
     for (const orb of this.orbs) {
       if (!orb.alive) continue;
       if (dist2(orb.x, orb.y, this.px, this.py) < pickR * pickR) {

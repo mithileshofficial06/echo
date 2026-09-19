@@ -22,6 +22,8 @@ export const GRAZE_MARGIN = 20;
 export const COMBO_WINDOW_TICKS = 150;
 
 export const ORB_RADIUS = 9;
+/** Pickups are a little generous: feels better than pixel-exact. */
+export const ORB_PICKUP_BONUS = 5;
 export const ORB_MARGIN = 40;
 export const ORB_MIN_DIST_FROM_PLAYER = 120;
 
