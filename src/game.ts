@@ -21,6 +21,8 @@ export interface GameOptions {
   hideJoystick?: boolean;
   /** No music or sfx (menu background). */
   silent?: boolean;
+  /** Draw the HUD (default true). */
+  hud?: boolean;
   /** Replaces the "SCORE" HUD label, e.g. "REPLAY · NAME". */
   label?: string;
   onEvent?: (e: SimEvent, sim: Sim) => void;
@@ -56,6 +58,11 @@ export class Game {
     this.sound = opts.silent ? null : sound;
     this.fx.banner("LOOP 01", "#fff", 44, 70);
     this.sound?.startLoop(0);
+  }
+
+  /** The silent bot game that plays behind menus. */
+  get isAttract(): boolean {
+    return !!this.opts.silent;
   }
 
   pause() {
@@ -94,7 +101,7 @@ export class Game {
     this.renderer.draw(this.sim, this.fx, this.opts.hideJoystick ? null : this.input.joy, {
       alpha: this.state === "running" ? this.acc / TICK_MS : 1,
       time,
-      hud: true,
+      hud: this.opts.hud ?? true,
       label: this.opts.label,
     });
   }
