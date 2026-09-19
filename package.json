@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:determinism": "esbuild scripts/determinism.ts --bundle --platform=node --outfile=node_modules/.cache/determinism.cjs --log-level=warning && node node_modules/.cache/determinism.cjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
