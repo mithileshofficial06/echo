@@ -11,7 +11,6 @@
     "build:engine": "esbuild src/engine/index.ts --bundle --format=esm --target=es2022 --outfile=supabase/functions/submit-run/engine.js",
     "test:determinism": "esbuild scripts/determinism.ts --bundle --platform=node --outfile=node_modules/.cache/determinism.cjs --log-level=warning && node node_modules/.cache/determinism.cjs"
   },
-  "devDependencies": {
   "dependencies": {
     "next": "^15.5.4",
     "react": "^19.1.1",
