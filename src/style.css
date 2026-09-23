@@ -783,6 +783,27 @@ body.touch.playing #forget-btn {
   opacity: 0.85;
 }
 
+#hint.guided {
+  bottom: calc(34px + env(safe-area-inset-bottom));
+  width: min(620px, calc(100% - 32px));
+  padding: 14px 18px 12px;
+  border: 1px solid rgba(183, 243, 107, 0.55);
+  background: rgba(9, 18, 16, 0.9);
+  color: var(--fg);
+  box-shadow: 0 0 28px rgba(183, 243, 107, 0.12);
+  font-size: 14px;
+}
+
+#hint.guided::before {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--signal);
+  content: "LIVE COACH // FOLLOW THIS";
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
 body:not(.touch) #hint {
   width: min(640px, calc(100% - 32px));
 }

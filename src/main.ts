@@ -48,6 +48,7 @@ class App {
   private boardDay = dailyKey();
   private boardScope: LeaderboardScope = "overall";
   private guidedRun = false;
+  private guidedOrbSeen = false;
 
   constructor() {
     ui.append(forgetBtn, pauseBtn, hint);
@@ -219,6 +220,7 @@ class App {
       return;
     }
     this.guidedRun = !this.hasSeenTutorial();
+    this.guidedOrbSeen = false;
     sound.unlock();
     this.kind = kind;
     this.day = dailyKey();
@@ -293,10 +295,15 @@ class App {
 
   private onGameEvent(e: SimEvent, sim: Sim, tutorial: boolean) {
     if (e.type === "death") this.lastDeath = { cause: e.cause, loop: e.ghost?.loop };
+    if (this.guidedRun && e.type === "orb" && !this.guidedOrbSeen) {
+      this.guidedOrbSeen = true;
+      this.showHint("Nice. Keep moving until the loop closes. Stay away from the arena edges.", 5000);
+      return;
+    }
     if (e.type !== "loop") return;
     const quotaUp = orbQuota(e.loop) > orbQuota(e.loop - 1);
     const touch = input.touchUsed;
-    if (this.guidedRun && e.loop === 1) {
+    if (this.guidedRun && e.loop === 2) {
       try {
         localStorage.setItem("echo.tutorialSeen", "1");
       } catch {
@@ -315,9 +322,10 @@ class App {
 
   private showHint(text: string, ms: number) {
     hint.textContent = text;
+    hint.classList.toggle("guided", this.guidedRun);
     hint.classList.add("show");
     clearTimeout(this.hintTimer);
-    this.hintTimer = window.setTimeout(() => hint.classList.remove("show"), ms);
+    this.hintTimer = window.setTimeout(() => hint.classList.remove("show", "guided"), ms);
   }
 
   pause() {
