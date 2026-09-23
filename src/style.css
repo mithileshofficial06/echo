@@ -783,27 +783,6 @@ body.touch.playing #forget-btn {
   opacity: 0.85;
 }
 
-#hint.guided {
-  bottom: calc(34px + env(safe-area-inset-bottom));
-  width: min(620px, calc(100% - 32px));
-  padding: 14px 18px 12px;
-  border: 1px solid rgba(183, 243, 107, 0.55);
-  background: rgba(9, 18, 16, 0.9);
-  color: var(--fg);
-  box-shadow: 0 0 28px rgba(183, 243, 107, 0.12);
-  font-size: 14px;
-}
-
-#hint.guided::before {
-  display: block;
-  margin-bottom: 7px;
-  color: var(--signal);
-  content: "LIVE COACH // FOLLOW THIS";
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.16em;
-}
-
 body:not(.touch) #hint {
   width: min(640px, calc(100% - 32px));
 }
@@ -1105,31 +1084,6 @@ body::before {
   border: 2px solid var(--signal);
   box-shadow: 0 0 0 5px rgba(183, 243, 107, 0.12), 0 0 34px rgba(183, 243, 107, 0.2);
   animation: guided-entry-pulse 1.8s ease-in-out infinite;
-}
-
-.menu-buttons .guided-entry::after {
-  position: absolute;
-  top: -42px;
-  right: 18px;
-  padding: 7px 10px;
-  border: 1px solid var(--signal);
-  background: #111a16;
-  color: var(--signal);
-  content: attr(data-coach);
-  font-size: 9px;
-  letter-spacing: 0.13em;
-  white-space: nowrap;
-  box-shadow: 5px 5px 0 rgba(183, 243, 107, 0.12);
-}
-
-.menu-buttons .guided-entry::before {
-  position: absolute;
-  top: -12px;
-  right: 40px;
-  width: 1px;
-  height: 12px;
-  background: var(--signal);
-  content: "";
 }
 
 @keyframes guided-entry-pulse {
@@ -1491,4 +1445,179 @@ body::before {
   .tutorial-footer button.primary {
     min-width: 0;
   }
+}
+
+/* ---------- First-run coach ---------- */
+
+#ui > .coach {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.25s, visibility 0.25s;
+}
+
+#ui > .coach.on {
+  opacity: 1;
+  visibility: visible;
+}
+
+.coach-spot {
+  position: fixed;
+  border: 2px solid var(--signal);
+  border-radius: 6px;
+  box-shadow: 0 0 0 0 rgba(3, 6, 10, 0), 0 0 26px rgba(183, 243, 107, 0.45);
+  transition: left 0.3s ease, top 0.3s ease, width 0.3s ease, height 0.3s ease, border-radius 0.3s, box-shadow 0.35s, opacity 0.2s;
+  animation: coach-ring 1.4s ease-in-out infinite;
+}
+
+.coach.dim .coach-spot {
+  box-shadow: 0 0 0 200vmax rgba(3, 6, 10, 0.74), 0 0 26px rgba(183, 243, 107, 0.45);
+}
+
+.coach.dim.no-target::before {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 6, 10, 0.62);
+  content: "";
+}
+
+.coach-spot.circle {
+  border-radius: 50%;
+}
+
+/* Expanding ripple from the spotlight so the eye lands on it. */
+.coach-spot::after {
+  position: absolute;
+  inset: -2px;
+  border: 2px solid var(--signal);
+  border-radius: inherit;
+  content: "";
+  animation: coach-ripple 1.4s ease-out infinite;
+}
+
+@keyframes coach-ring {
+  50% { border-color: #e6ffc2; }
+}
+
+@keyframes coach-ripple {
+  from { opacity: 0.8; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.35); }
+}
+
+.coach-bubble {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: min(380px, calc(100vw - 24px));
+  padding: 16px 18px 14px;
+  border: 1px solid var(--signal);
+  background: linear-gradient(160deg, rgba(20, 32, 24, 0.97), rgba(8, 13, 12, 0.97));
+  box-shadow: 8px 8px 0 rgba(183, 243, 107, 0.12), 0 20px 60px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  transition: left 0.3s ease, top 0.3s ease;
+}
+
+.coach-bubble.pop {
+  animation: coach-pop 0.38s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+
+@keyframes coach-pop {
+  from { opacity: 0; transform: translateY(10px) scale(0.94); }
+}
+
+.coach-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.coach-kicker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--signal);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.coach-kicker::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--signal);
+  box-shadow: 0 0 10px var(--signal);
+  content: "";
+  animation: coach-ring 1s ease-in-out infinite;
+}
+
+button.coach-voice {
+  padding: 4px 8px;
+  border: 1px solid rgba(183, 243, 107, 0.4);
+  background: transparent;
+  color: var(--signal);
+  font-size: 9px;
+  clip-path: none;
+}
+
+button.coach-voice.off {
+  border-color: var(--line);
+  color: var(--dim);
+}
+
+.coach-text {
+  min-height: 3em;
+  color: var(--fg);
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.coach-text.typing::after {
+  display: inline-block;
+  width: 8px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -2px;
+  background: var(--signal);
+  content: "";
+  animation: coach-caret 0.5s steps(2) infinite;
+}
+
+@keyframes coach-caret {
+  50% { opacity: 0; }
+}
+
+.coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.coach-actions .link {
+  font-size: 10px;
+  letter-spacing: 0.1em;
+}
+
+.coach-actions .primary {
+  padding: 10px 14px;
+  border-color: var(--signal);
+  background: var(--signal);
+  color: #0a120b;
+  font-size: 12px;
+}
+
+.coach-actions .primary[hidden] {
+  display: none;
+}
+
+body.touch .coach-actions .primary small {
+  display: none;
 }

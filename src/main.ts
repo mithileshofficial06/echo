@@ -1,6 +1,6 @@
 import { Sound } from "./audio/sound";
 import { createBot } from "./bot";
-import { orbQuota } from "./engine/constants";
+import { LOOP_TICKS, ORB_RADIUS, PLAYER_RADIUS, TICK_RATE, orbQuota } from "./engine/constants";
 import { dailyKey, dailySeed } from "./engine/rng";
 import type { DeathCause, Sim, SimEvent } from "./engine/sim";
 import { Game, replaySource, type GameResult } from "./game";
@@ -20,10 +20,13 @@ import {
 } from "./net/leaderboard";
 import { Renderer } from "./render/renderer";
 import { downloadCanvas, memoryId, renderTapestry } from "./render/tapestry";
+import { Coach, type CoachStep } from "./ui/coach";
 import { bindActions, el, escapeHtml, fmt } from "./ui/dom";
 
 type Kind = "daily" | "practice";
 type Screen = "menu" | "how" | "identity" | "play" | "paused" | "over" | "board" | "replay";
+/** Where the first-run guide is inside the first two loops. */
+type GuideStage = "off" | "intro" | "orb" | "survive" | "echo";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ui = document.getElementById("ui")!;
@@ -48,10 +51,16 @@ class App {
   private boardDay = dailyKey();
   private boardScope: LeaderboardScope = "overall";
   private guidedRun = false;
-  private guidedOrbSeen = false;
+  private guideStage: GuideStage = "off";
+  /** The intro walkthrough plays once per session; retries skip straight to moving. */
+  private introDone = false;
+  private nudges = new Set<string>();
+  private liveStep: CoachStep | null = null;
+  private coach: Coach;
 
   constructor() {
     ui.append(forgetBtn, pauseBtn, hint);
+    this.coach = new Coach(ui, () => !sound.muted, () => this.skipTutorial());
     pauseBtn.addEventListener("click", () => this.pause());
     try {
       this.runsPlayed = Number(localStorage.getItem("echo.runs") || 0);
@@ -73,12 +82,14 @@ class App {
     const dt = now - this.last;
     this.last = now;
     this.game?.frame(dt, now / 1000);
+    if (this.guidedRun && this.screen === "play" && this.game?.state === "running") this.guideTick(this.game.sim);
     requestAnimationFrame(this.frame);
   };
 
   // ---------- Layers ----------
 
   private setLayer(node: HTMLElement | null) {
+    this.coach.hide();
     this.layer?.remove();
     this.layer = node;
     if (node) ui.append(node);
@@ -148,7 +159,7 @@ class App {
           <section class="launch-deck">
             <div class="deck-intro"><span>SELECT ENTRY</span><b>THE LOOP IS ALREADY RUNNING.</b></div>
             <div class="buttons menu-buttons">
-              <button class="primary ${guideEntry ? "guided-entry" : ""}" data-act="daily" ${guideEntry ? 'data-coach="START HERE · CLICK THIS"' : ""}><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
+              <button class="primary ${guideEntry ? "guided-entry" : ""}" data-act="daily"><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
               <button data-act="practice"><span>CREATE PRIVATE LOOP</span><small>RANDOM SEED <b>→</b></small></button>
             </div>
             <div class="deck-links">
@@ -178,6 +189,13 @@ class App {
       () => this.click(),
     );
     this.setLayer(node);
+    if (guideEntry) {
+      this.coach.show({
+        target: node.querySelector<HTMLElement>('[data-act="daily"]'),
+        kicker: "WELCOME TO ECHO",
+        text: "Welcome to ECHO. Click Play the Daily Loop to begin. I'll guide you through your first run.",
+      });
+    }
   }
 
   showHow() {
@@ -220,7 +238,6 @@ class App {
       return;
     }
     this.guidedRun = !this.hasSeenTutorial();
-    this.guidedOrbSeen = false;
     sound.unlock();
     this.kind = kind;
     this.day = dailyKey();
@@ -240,10 +257,12 @@ class App {
       onEvent: (e, sim) => this.onGameEvent(e, sim, tutorial),
       onOver: (r) => this.showGameOver(r),
     });
-    this.showHint(
-      this.guidedRun ? "Move with WASD or the arrows. Chase the glowing ◆ orb." : tutorial ? "Collect ◆ orbs. You need 1 before the loop ends." : `${kind === "daily" ? "DAILY " + this.day : "PRACTICE"}`,
-      this.guidedRun ? 7000 : tutorial ? 5000 : 1800,
-    );
+    if (this.guidedRun) this.beginGuide();
+    else
+      this.showHint(
+        tutorial ? "Collect ◆ orbs. You need 1 before the loop ends." : `${kind === "daily" ? "DAILY " + this.day : "PRACTICE"}`,
+        tutorial ? 5000 : 1800,
+      );
   }
 
   /** Names are collected before the run so verified daily scores can save automatically. */
@@ -283,6 +302,13 @@ class App {
     bindActions(node, { back: () => this.showMenu() }, () => this.click());
     this.setLayer(node);
     setTimeout(() => field.focus(), 0);
+    if (!this.hasSeenTutorial()) {
+      this.coach.show({
+        target: form,
+        kicker: "FIRST, A NAME",
+        text: "Give your echo a name. It appears on the global leaderboard. Type it, then press Begin Loop.",
+      });
+    }
   }
 
   private hasSeenTutorial(): boolean {
@@ -295,23 +321,14 @@ class App {
 
   private onGameEvent(e: SimEvent, sim: Sim, tutorial: boolean) {
     if (e.type === "death") this.lastDeath = { cause: e.cause, loop: e.ghost?.loop };
-    if (this.guidedRun && e.type === "orb" && !this.guidedOrbSeen) {
-      this.guidedOrbSeen = true;
-      this.showHint("Nice. Keep moving until the loop closes. Stay away from the arena edges.", 5000);
+    if (this.guidedRun) {
+      this.onGuideEvent(e);
       return;
     }
     if (e.type !== "loop") return;
     const quotaUp = orbQuota(e.loop) > orbQuota(e.loop - 1);
     const touch = input.touchUsed;
-    if (this.guidedRun && e.loop === 2) {
-      try {
-        localStorage.setItem("echo.tutorialSeen", "1");
-      } catch {
-        /* ignore */
-      }
-      this.guidedRun = false;
-      this.showHint("Loop 1 complete. That glowing path is your echo now. Keep moving and don't touch it.", 6500);
-    } else if (tutorial && e.loop === 2) {
+    if (tutorial && e.loop === 2) {
       this.showHint("That's you, 10 seconds ago. Don't touch it. Brush past it for SYNC.", 5500);
     } else if (e.charged && sim.forgetCharges === 1 && (tutorial || e.loop === 4)) {
       this.showHint(`FORGET charged: ${touch ? "tap FORGET" : "press SPACE"} to erase your oldest echo.`, 4500);
@@ -320,12 +337,159 @@ class App {
     }
   }
 
+  // ---------- First-run guide ----------
+
+  private playerTarget = () =>
+    this.game ? renderer.circleRect(this.game.sim.px, this.game.sim.py, PLAYER_RADIUS * 1.7) : null;
+
+  private orbTarget = () => {
+    const sim = this.game?.sim;
+    if (!sim) return null;
+    let best: { x: number; y: number } | null = null;
+    let bestD = Infinity;
+    for (const o of sim.orbs) {
+      const d = o.alive ? Math.hypot(o.x - sim.px, o.y - sim.py) : Infinity;
+      if (d < bestD) [best, bestD] = [o, d];
+    }
+    return best ? renderer.circleRect(best.x, best.y, ORB_RADIUS * 2) : null;
+  };
+
+  private ghostTarget = () => {
+    const sim = this.game?.sim;
+    const g = sim?.activeGhosts.at(-1);
+    if (!sim || !g) return null;
+    const [x, y] = renderer.ghostRenderPos(sim, g, 1);
+    return renderer.circleRect(x, y, PLAYER_RADIUS * 1.9);
+  };
+
+  /** A coach bubble shown while the game keeps running (no dimming, no button). */
+  private live(step: Omit<CoachStep, "dim">) {
+    this.liveStep = { ...step, dim: false };
+    this.coach.show(this.liveStep);
+  }
+
+  /** Freeze the first loop and walk the player through what they're looking at. */
+  private beginGuide() {
+    const game = this.game!;
+    const touch = input.touchUsed;
+    this.nudges.clear();
+    this.liveStep = null;
+    game.pause();
+    const moveText = touch
+      ? "Drag anywhere on the screen to move. Now go grab that orb!"
+      : "Move with W A S D or the arrow keys. Now go grab that orb!";
+    const go = () => {
+      if (this.game !== game) return;
+      this.guideStage = "orb";
+      input.clear();
+      game.resume();
+      this.live({
+        target: this.orbTarget,
+        shape: "circle",
+        kicker: "YOUR MOVE",
+        text: touch ? "Drag to move. Grab the ◆ orb." : "WASD or arrows to move. Grab the ◆ orb.",
+        quiet: true,
+      });
+    };
+    if (this.introDone) {
+      this.coach.show({ target: this.playerTarget, shape: "circle", kicker: "ONE MORE TRY", text: moveText, action: "GO" }, go);
+      return;
+    }
+    this.guideStage = "intro";
+    this.coach.sequence(
+      [
+        { target: this.playerTarget, shape: "circle", action: "NEXT", text: "This glowing dot is you. Every run is split into loops that last ten seconds." },
+        { target: this.orbTarget, shape: "circle", action: "NEXT", text: "These diamonds are orbs. Collect at least one in every loop, or you fade away." },
+        { target: () => renderer.hudRect("timer"), action: "NEXT", text: "This is the loop timer. When it reaches zero, the next loop begins." },
+        { target: () => renderer.hudRect("orbs"), action: "NEXT", text: "This shows the orbs you still need this loop. Fill it to stay alive." },
+        { target: this.playerTarget, shape: "circle", action: "LET'S GO", text: moveText },
+      ],
+      () => {
+        this.introDone = true;
+        go();
+      },
+    );
+  }
+
+  /** Time-based nudges during loop one. */
+  private guideTick(sim: Sim) {
+    const left = LOOP_TICKS - sim.loopTick;
+    if (this.guideStage === "orb" && left < TICK_RATE * 4 && !this.nudges.has("hurry")) {
+      this.nudges.add("hurry");
+      this.live({ target: this.orbTarget, shape: "circle", kicker: "HURRY", text: "Quick! Grab an orb before the timer hits zero!" });
+    } else if (this.guideStage === "survive" && left < TICK_RATE * 3 && !this.nudges.has("record")) {
+      this.nudges.add("record");
+      this.live({
+        target: this.playerTarget,
+        shape: "circle",
+        kicker: "HEADS UP",
+        text: "Here's the twist: every move you made this loop was recorded. Watch what happens next.",
+      });
+    }
+  }
+
+  private onGuideEvent(e: SimEvent) {
+    const game = this.game;
+    if (!game) return;
+    if (e.type === "death") {
+      this.guideStage = "off";
+      this.liveStep = null;
+      this.coach.hide();
+    } else if (e.type === "orb" && this.guideStage === "orb") {
+      this.guideStage = "survive";
+      this.live({
+        target: () => renderer.hudRect("orbs"),
+        kicker: "NICE!",
+        text: "Got it! That's enough to survive this loop. Keep moving until the timer runs out.",
+      });
+    } else if (e.type === "loop" && e.loop === 2) {
+      this.guideStage = "echo";
+      this.liveStep = null;
+      game.pause();
+      this.coach.sequence(
+        [
+          { target: this.ghostTarget, shape: "circle", kicker: "YOUR ECHO", action: "NEXT", text: "Meet your echo. That's you from the last loop, repeating every move you just made." },
+          { target: this.ghostTarget, shape: "circle", kicker: "DON'T TOUCH", action: "NEXT", text: "If it touches you, the run is over. But brushing close past it without touching builds SYNC, a combo that multiplies your points." },
+          { target: () => renderer.hudRect("orbs"), kicker: "IT GETS HARDER", action: "NEXT", text: "Every loop adds another echo, and you still need orbs each time. The arena fills up fast." },
+          { target: null, kicker: "YOU'RE READY", action: "PLAY", text: "That's everything. Survive as many loops as you can. Good luck!" },
+        ],
+        () => {
+          if (this.game !== game) return;
+          this.finishTutorial();
+          this.coach.hide();
+          input.clear();
+          game.resume();
+          this.showHint("Survive. Every loop adds another echo.", 3000);
+        },
+      );
+    }
+  }
+
+  private finishTutorial() {
+    try {
+      localStorage.setItem("echo.tutorialSeen", "1");
+    } catch {
+      /* ignore */
+    }
+    this.guidedRun = false;
+    this.guideStage = "off";
+    this.liveStep = null;
+  }
+
+  private skipTutorial() {
+    this.finishTutorial();
+    if (this.screen === "menu") this.showMenu();
+    else if (this.screen === "play" && this.game?.state === "paused") {
+      input.clear();
+      this.game.resume();
+    }
+  }
+
   private showHint(text: string, ms: number) {
     hint.textContent = text;
-    hint.classList.toggle("guided", this.guidedRun);
     hint.classList.add("show");
     clearTimeout(this.hintTimer);
-    this.hintTimer = window.setTimeout(() => hint.classList.remove("show", "guided"), ms);
+    this.hintTimer = window.setTimeout(() => hint.classList.remove("show"), ms);
   }
 
   pause() {
@@ -363,6 +527,7 @@ class App {
     this.screen = "play";
     this.setLayer(null);
     this.game.resume();
+    if (this.guidedRun && this.liveStep) this.coach.show(this.liveStep);
   }
 
   // ---------- Game over ----------

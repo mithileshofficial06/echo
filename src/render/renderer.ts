@@ -11,6 +11,13 @@ export const FONT = '"JetBrains Mono", ui-monospace, Consolas, monospace';
 const TRAIL_TICKS = 22;
 const PREVIEW_TICKS = 36;
 
+export interface ScreenRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface RenderOptions {
   alpha: number;
   time: number;
@@ -58,6 +65,29 @@ export class Renderer {
     const x = (ax - ARENA_W / 2) * this.scale;
     const y = (ay - ARENA_H / 2) * this.scale;
     return this.rotated ? [this.cx - y, this.cy + x] : [this.cx + x, this.cy + y];
+  }
+
+  /** Screen box around an arena-space circle (used by tutorial spotlights). */
+  circleRect(ax: number, ay: number, r: number): ScreenRect {
+    const [x, y] = this.toScreen(ax, ay);
+    const rr = Math.max(r * this.scale, 16);
+    return { x: x - rr, y: y - rr, w: rr * 2, h: rr * 2 };
+  }
+
+  /** Screen box of a HUD widget, mirroring the layout in drawHud. */
+  hudRect(which: "timer" | "orbs"): ScreenRect {
+    const small = this.w < 600;
+    const pad = 16;
+    const top = Math.max(this.arenaTop - (small ? 52 : 66), 8);
+    const big = small ? 22 : 30;
+    const label = small ? 9 : 11;
+    if (which === "timer") {
+      const w = big * 3;
+      return { x: this.w / 2 - w / 2, y: top - 4, w, h: label + big + 12 };
+    }
+    const pip = small ? 12 : 15;
+    const w = small ? 92 : 118;
+    return { x: this.w - pad - w, y: top - 4, w: w + 4, h: label + pip + 30 };
   }
 
   private get arenaTop(): number {
