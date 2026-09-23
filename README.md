@@ -25,10 +25,10 @@ ECHO is a browser arcade game about surviving your own past. Each loop lasts 10 
 
 ## Tech
 
-- **Vite + TypeScript + Canvas 2D**, with no game framework. About 16 KB of JS gzipped.
+- **Next.js + TypeScript + Canvas 2D**, with no game framework. About 16 KB of game JS gzipped.
 - **WebAudio** for all music and sound effects.
 - **Supabase** for the leaderboard: a Postgres `runs` table (public read, no client writes) and a `submit-run` edge function that verifies runs.
-- **Vercel** for static hosting.
+- **Vercel** for hosting the Next.js app.
 
 ```
 src/
@@ -70,10 +70,11 @@ the verification function can create runs or alter lifetime player progress.
 
 ```bash
 npm install
-npm run dev               # http://localhost:5173  (add ?bot to let a bot play)
-npm run build             # production build to dist/
+npm run dev               # http://localhost:3000  (add ?bot to let a bot play)
+npm run build             # production build
+npm run start             # serve the production build
 npm run test:determinism  # replays 50 bot runs and checks they re-simulate identically
 ```
 
-The game works fully offline; scores are then saved on the device. To enable the global leaderboard, copy `.env.example` to `.env.local` and fill in your Supabase URL and anon key.
+The game works fully offline; scores are then saved on the device. To enable the global leaderboard, copy `.env.example` to `.env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
 

@@ -1,4 +1,3 @@
-import "./style.css";
 import { Sound } from "./audio/sound";
 import { createBot } from "./bot";
 import { orbQuota } from "./engine/constants";
@@ -228,7 +227,7 @@ class App {
 
     const tutorial = this.runsPlayed < 2;
     // Dev-only: ?bot lets the attract bot play a real run (for testing late loops).
-    const devBot = import.meta.env.DEV && new URLSearchParams(location.search).has("bot");
+      const devBot = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).has("bot");
     this.game = new Game(renderer, input, sound, {
       seed,
       source: devBot ? createBot() : undefined,
