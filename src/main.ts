@@ -17,13 +17,14 @@ import {
   setName,
   submitRun,
   type LeaderboardEntry,
+  type LeaderboardScope,
 } from "./net/leaderboard";
 import { Renderer } from "./render/renderer";
 import { downloadCanvas, memoryId, renderTapestry } from "./render/tapestry";
 import { bindActions, el, escapeHtml, fmt } from "./ui/dom";
 
 type Kind = "daily" | "practice";
-type Screen = "menu" | "how" | "play" | "paused" | "over" | "board" | "replay";
+type Screen = "menu" | "how" | "identity" | "play" | "paused" | "over" | "board" | "replay";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ui = document.getElementById("ui")!;
@@ -46,6 +47,7 @@ class App {
   private hintTimer = 0;
   private runsPlayed = 0;
   private boardDay = dailyKey();
+  private boardScope: LeaderboardScope = "overall";
 
   constructor() {
     ui.append(forgetBtn, pauseBtn, hint);
@@ -100,7 +102,7 @@ class App {
   }
 
   private isMenuLike(): boolean {
-    return this.screen === "menu" || this.screen === "how" || this.screen === "board";
+    return this.screen === "menu" || this.screen === "how" || this.screen === "identity" || this.screen === "board";
   }
 
   private ensureAttract() {
@@ -115,20 +117,48 @@ class App {
     const best = getBest();
     const node = el(`
       <div class="screen menu">
-        <div class="transmission" aria-hidden="true"><span>REC // 10.00s</span><i></i><span>PAST SELVES: LIVE</span></div>
-        <h1 class="title" data-text="ECHO">ECHO</h1>
-        <p class="tag">a ten-second survival ritual against your own recorded past</p>
-        <div class="manifesto"><span>01 / MOVE</span><span>02 / REPEAT</span><span>03 / SURVIVE</span></div>
-        <div class="buttons">
-          <button class="primary" data-act="daily">ENTER TODAY'S LOOP <small>${this.day}</small></button>
-          <button data-act="practice">OPEN A PRIVATE LOOP <small>random seed</small></button>
-          <button data-act="board">LEADERBOARD</button>
-          <button data-act="how">READ THE SIGNAL</button>
-        </div>
-        <div class="meta">
-          ${best ? `<span>BEST <b>${fmt(best)}</b></span>` : ""}
-          <button class="link" data-act="mute">${sound.muted ? "SOUND OFF" : "SOUND ON"}</button>
-          <span class="keys"><kbd>ENTER</kbd> play</span>
+        <div class="menu-haze" aria-hidden="true"></div>
+        <div class="menu-shell">
+          <header class="signal-head">
+            <div class="wordmark"><span class="wordmark-mark">E</span> ECHO <i>/</i> ARCHIVE</div>
+            <div class="signal-state"><span></span> TEMPORAL LINK STABLE</div>
+            <div class="signal-id">SYS.09 // ${this.day.replaceAll("-", ".")}</div>
+          </header>
+          <main class="hero-grid">
+            <section class="hero-copy">
+              <div class="eyebrow"><span>01</span> SURVIVAL PROTOCOL</div>
+              <h1 class="title" data-text="ECHO">ECHO</h1>
+              <p class="tag">Your last ten seconds are not history.<br>They are the next thing hunting you.</p>
+              <div class="hero-facts">
+                <div><b>10.00</b><span>SECONDS / LOOP</span></div>
+                <div><b>∞</b><span>PAST SELVES</span></div>
+                <div><b>01</b><span>WAY OUT</span></div>
+              </div>
+            </section>
+            <section class="echo-vessel" aria-label="Animated echo field">
+              <div class="vessel-label top">LIVE MEMORY MAP</div>
+              <div class="vessel-label bottom">DO NOT COLLIDE WITH YOURSELF</div>
+              <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+              <div class="echo-node node-one"></div><div class="echo-node node-two"></div><div class="echo-node node-three"></div>
+              <div class="core-node"></div><div class="vessel-cross"></div>
+            </section>
+          </main>
+          <section class="launch-deck">
+            <div class="deck-intro"><span>SELECT ENTRY</span><b>THE LOOP IS ALREADY RUNNING.</b></div>
+            <div class="buttons menu-buttons">
+              <button class="primary" data-act="daily"><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
+              <button data-act="practice"><span>CREATE PRIVATE LOOP</span><small>RANDOM SEED <b>→</b></small></button>
+            </div>
+            <div class="deck-links">
+              <button data-act="board">⌁ &nbsp; LEADERBOARD</button>
+              <button data-act="how">? &nbsp; HOW IT WORKS</button>
+              <button class="link" data-act="mute">${sound.muted ? "SOUND OFF" : "SOUND ON"}</button>
+            </div>
+          </section>
+          <footer class="menu-footer">
+            <span>${best ? `PERSONAL BEST // ${fmt(best)}` : "NO MEMORY RECORDED YET"}</span>
+            <span class="keys"><kbd>ENTER</kbd> BEGIN &nbsp; <kbd>WASD</kbd> MOVE &nbsp; <kbd>SPACE</kbd> FORGET</span>
+          </footer>
         </div>
       </div>`);
     bindActions(
@@ -146,7 +176,6 @@ class App {
       () => this.click(),
     );
     this.setLayer(node);
-    if (!this.runsPlayed) node.querySelector<HTMLElement>('[data-act="how"]')!.innerHTML = `HOW TO PLAY <small>new? start here</small>`;
   }
 
   showHow() {
@@ -183,6 +212,10 @@ class App {
   // ---------- Playing ----------
 
   startRun(kind: Kind) {
+    if (!getName()) {
+      this.showIdentity(kind);
+      return;
+    }
     sound.unlock();
     this.kind = kind;
     this.day = dailyKey();
@@ -206,6 +239,45 @@ class App {
       tutorial ? "Collect ◆ orbs. You need 1 before the loop ends." : `${kind === "daily" ? "DAILY " + this.day : "PRACTICE"}`,
       tutorial ? 5000 : 1800,
     );
+  }
+
+  /** Names are collected before the run so verified daily scores can save automatically. */
+  private showIdentity(kind: Kind) {
+    this.screen = "identity";
+    this.ensureAttract();
+    const node = el(`
+      <div class="screen identity-screen">
+        <div class="identity-card">
+          <div class="identity-index">PLAYER REGISTRY // REQUIRED</div>
+          <h2>NAME YOUR ECHO</h2>
+          <p>Every verified daily run is saved to this name. It is shown on the global leaderboard.</p>
+          <form class="identity-form">
+            <input name="name" maxlength="16" autocomplete="nickname" placeholder="ENTER A NAME" autofocus />
+            <button class="primary" type="submit">BEGIN LOOP <small>→</small></button>
+          </form>
+          <div class="identity-note">Use 1–16 letters, numbers, spaces, dots, dashes, or underscores.</div>
+          <button class="link" data-act="back">BACK</button>
+        </div>
+      </div>`);
+    const form = node.querySelector<HTMLFormElement>("form")!;
+    const field = form.querySelector<HTMLInputElement>("input")!;
+    const note = node.querySelector<HTMLElement>(".identity-note")!;
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const name = cleanName(field.value).toUpperCase();
+      if (!name) {
+        note.textContent = "A name is required to enter the archive.";
+        note.classList.add("bad");
+        field.focus();
+        return;
+      }
+      setName(name);
+      this.click();
+      this.startRun(kind);
+    });
+    bindActions(node, { back: () => this.showMenu() }, () => this.click());
+    this.setLayer(node);
+    setTimeout(() => field.focus(), 0);
   }
 
   private onGameEvent(e: SimEvent, sim: Sim, tutorial: boolean) {
@@ -311,10 +383,7 @@ class App {
             </div>
             ${
               kind === "daily"
-                ? `<form class="submit">
-                     <input name="name" maxlength="16" placeholder="YOUR NAME" autocomplete="nickname" value="${escapeHtml(name)}" />
-                     <button class="primary" type="submit">SUBMIT</button>
-                   </form>`
+                ? `<div class="status">Preparing verified score for ${escapeHtml(name)}…</div>`
                 : `<div class="status">Practice runs aren't ranked. Play DAILY to get on the board.</div>`
             }
             <div class="status" data-status></div>
@@ -343,37 +412,25 @@ class App {
       () => this.click(),
     );
 
-    const form = node.querySelector<HTMLFormElement>("form.submit");
-    form?.addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const field = form.querySelector("input")!;
-      const clean = cleanName(field.value).toUpperCase();
-      if (!clean) {
-        status.className = "status bad";
-        status.textContent = "Enter a name first.";
-        field.focus();
-        return;
-      }
-      setName(clean);
-      const btn = form.querySelector("button")!;
-      btn.disabled = true;
-      field.disabled = true;
-      status.className = "status";
-      status.textContent = online ? "Verifying run…" : "Saving…";
-      const res = await submitRun(clean, day, sim.seed, inputs, s);
-      if (res.ok) {
-        status.className = "status good";
-        status.textContent = `${res.rank ? `RANK #${res.rank} TODAY` : "SUBMITTED"}${online ? " · verified by replay" : " · saved on this device (offline)"}`;
-        form.remove();
-      } else {
-        status.className = "status bad";
-        status.textContent = res.error || "Submit failed.";
-        btn.disabled = false;
-        field.disabled = false;
-      }
-    });
-
     this.setLayer(node);
+    if (kind === "daily") {
+      // A player has already registered their name before the run starts, so
+      // every daily game can save itself as soon as it is over.
+      void (async () => {
+        status.className = "status";
+        status.textContent = online ? "Verifying score and updating global placement…" : "Saving on this device…";
+        const res = await submitRun(name, day, sim.seed, inputs, s);
+        if (this.screen !== "over" || this.layer !== node) return;
+        if (res.ok) {
+          status.className = "status good";
+          const ranks = [res.rank && `TODAY #${res.rank}`, res.overallRank && `ALL-TIME #${res.overallRank}`].filter(Boolean).join("  ·  ");
+          status.textContent = `${ranks || "SAVED"}${online ? " · global score updated" : " · saved on this device"}`;
+        } else {
+          status.className = "status bad";
+          status.textContent = res.error || "Could not save score. Check your connection and retry.";
+        }
+      })();
+    }
     // Keep the frozen final frame behind the overlay.
   }
 
@@ -417,22 +474,24 @@ class App {
 
   // ---------- Leaderboard ----------
 
-  async showBoard(day: string) {
+  async showBoard(day: string, scope: LeaderboardScope = "overall") {
     this.screen = "board";
     this.boardDay = day;
+    this.boardScope = scope;
     this.ensureAttract();
     const today = dailyKey();
     const node = el(`
       <div class="screen board-screen">
         <div class="board">
           <div class="board-head">
-            <button data-act="prev">‹</button>
+            <button data-act="prev" ${scope === "overall" ? "disabled" : ""}>‹</button>
             <div>
-              <h2>DAILY LOOP</h2>
-              <div class="day">${day === today ? "TODAY · " : ""}${day}</div>
+              <h2>${scope === "overall" ? "GLOBAL ARCHIVE" : "DAILY LOOP"}</h2>
+              <div class="day">${scope === "overall" ? "ALL-TIME PLACEMENT" : `${day === today ? "TODAY · " : ""}${day}`}</div>
             </div>
-            <button data-act="next" ${day >= today ? "disabled" : ""}>›</button>
+            <button data-act="next" ${scope === "overall" || day >= today ? "disabled" : ""}>›</button>
           </div>
+          <div class="board-tabs"><button class="${scope === "overall" ? "on" : ""}" data-act="overall">ALL-TIME</button><button class="${scope === "daily" ? "on" : ""}" data-act="dailyboard">TODAY</button></div>
           <div class="board-list"><div class="empty">Loading…</div></div>
           <div class="meta">${online ? "Every score is verified by replaying the run." : "Offline mode: scores are saved on this device only."}</div>
           <div class="row">
@@ -444,8 +503,10 @@ class App {
     bindActions(
       node,
       {
-        prev: () => this.showBoard(shiftDay(day, -1)),
-        next: () => this.showBoard(shiftDay(day, 1)),
+        prev: () => this.showBoard(shiftDay(day, -1), "daily"),
+        next: () => this.showBoard(shiftDay(day, 1), "daily"),
+        overall: () => this.showBoard(day, "overall"),
+        dailyboard: () => this.showBoard(today, "daily"),
         play: () => this.startRun("daily"),
         back: () => this.showMenu(),
       },
@@ -456,14 +517,14 @@ class App {
     const list = node.querySelector<HTMLElement>(".board-list")!;
     let rows: LeaderboardEntry[];
     try {
-      rows = await fetchTop(day, 25);
+      rows = await fetchTop(day, 25, scope);
     } catch {
       list.innerHTML = `<div class="empty">Couldn't load the leaderboard.</div>`;
       return;
     }
-    if (this.screen !== "board" || this.boardDay !== day) return;
+    if (this.screen !== "board" || this.boardDay !== day || this.boardScope !== scope) return;
     if (!rows.length) {
-      list.innerHTML = `<div class="empty">No runs yet. Be the first echo.</div>`;
+          list.innerHTML = `<div class="empty">No ${scope === "overall" ? "players" : "runs"} yet. Be the first echo.</div>`;
       return;
     }
     const me = getName();
@@ -473,15 +534,15 @@ class App {
         <div class="board-row ${me && r.name === me ? "me" : ""}">
           <span class="rank">${String(i + 1).padStart(2, "0")}</span>
           <span class="name">${escapeHtml(r.name)}</span>
-          <span class="loops">${r.loops} loops</span>
+          <span class="loops">${scope === "overall" ? `${r.games_played ?? 0} runs` : `${r.loops} loops`}</span>
           <span class="score">${fmt(r.score)}</span>
-          <button title="Watch replay" aria-label="Watch replay">▶</button>
+          ${scope === "daily" ? `<button title="Watch replay" aria-label="Watch replay">▶</button>` : `<span></span>`}
         </div>`);
-      row.querySelector("button")!.addEventListener("click", async () => {
+      row.querySelector("button")?.addEventListener("click", async () => {
         this.click();
         try {
           const rep = await fetchReplay(r.id);
-          this.startReplay(rep.seed, rep.inputs, rep.name, () => this.showBoard(day));
+          this.startReplay(rep.seed, rep.inputs, rep.name, () => this.showBoard(day, scope));
         } catch {
           row.querySelector("button")!.textContent = "✕";
         }
@@ -523,6 +584,9 @@ class App {
       case "board":
         if (k === "Escape") this.showMenu();
         else if (k === "Enter") this.startRun("daily");
+        break;
+      case "identity":
+        if (k === "Escape") this.showMenu();
         break;
     }
   }

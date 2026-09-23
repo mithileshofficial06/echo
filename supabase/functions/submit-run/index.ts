@@ -97,12 +97,29 @@ Deno.serve(async (req) => {
   if (!insert.ok) return json({ error: "Could not save run" }, 500);
   const [row] = await insert.json();
 
+  // The database function performs an atomic upsert: a player's lifetime
+  // score, run count and best score stay correct under concurrent submissions.
+  const progressRes = await db("rpc/record_player_progress", {
+    method: "POST",
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ player_name: name, run_score: result.score, run_loops: result.loops }),
+  });
+  if (!progressRes.ok) return json({ error: "Run saved, but player progress could not update" }, 500);
+  const progressBody = await progressRes.json();
+  // PostgREST serializes a function returning a table row as a one-item array.
+  const profile = Array.isArray(progressBody) ? progressBody[0] : progressBody;
+  if (!profile) return json({ error: "Run saved, but player profile was unavailable" }, 500);
+
   // Rank among each player's best score today.
   const board = await db(`leaderboard?select=name,score&day=eq.${day}`);
   const rows: { name: string; score: number }[] = board.ok ? await board.json() : [];
   const myBest = Math.max(result.score, ...rows.filter((r) => r.name === name).map((r) => r.score));
   const rank = rows.filter((r) => r.name !== name && r.score > myBest).length + 1;
 
+  const overall = await db("overall_leaderboard?select=name,score");
+  const overallRows: { name: string; score: number }[] = overall.ok ? await overall.json() : [];
+  const overallRank = overallRows.filter((r) => r.name !== name && r.score > profile.best_score).length + 1;
+
   const { inputs: _omit, seed: _seed, ...entry } = row;
-  return json({ entry, rank, best: myBest });
+  return json({ entry, rank, overallRank, best: myBest, profile });
 });

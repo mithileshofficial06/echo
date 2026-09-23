@@ -11,12 +11,27 @@ export interface LeaderboardEntry {
   day: string;
   created_at: string;
   verified?: boolean;
+  total_score?: number;
+  games_played?: number;
+  total_loops?: number;
 }
+
+export interface PlayerProfile {
+  name: string;
+  best_score: number;
+  total_score: number;
+  games_played: number;
+  total_loops: number;
+}
+
+export type LeaderboardScope = "daily" | "overall";
 
 export interface SubmitResult {
   ok: boolean;
   entry?: LeaderboardEntry;
   rank?: number;
+  overallRank?: number;
+  profile?: PlayerProfile;
   error?: string;
 }
 
@@ -91,7 +106,7 @@ export async function submitRun(
     const runs = [...readLocal(), entry].sort((a, b) => b.score - a.score);
     writeLocal(runs);
     const rank = runs.filter((r) => r.day === day).findIndex((r) => r.id === entry.id) + 1;
-    return { ok: true, entry, rank };
+    return { ok: true, entry, rank, overallRank: rank };
   }
 
   try {
@@ -103,26 +118,29 @@ export async function submitRun(
     });
     const data = await res.json();
     if (!res.ok) return { ok: false, error: data.error || `HTTP ${res.status}` };
-    return { ok: true, entry: data.entry, rank: data.rank };
+    return { ok: true, entry: data.entry, rank: data.rank, overallRank: data.overallRank, profile: data.profile };
   } catch (err) {
     return { ok: false, error: "Could not reach the leaderboard." };
   }
 }
 
-export async function fetchTop(day: string, limit = 20): Promise<LeaderboardEntry[]> {
+export async function fetchTop(day: string, limit = 20, scope: LeaderboardScope = "daily"): Promise<LeaderboardEntry[]> {
   if (!online) {
     // Best run per name, like the online leaderboard view.
     const best = new Map<string, LocalRun>();
     for (const r of readLocal()) {
-      if (r.day !== day) continue;
+      if (scope === "daily" && r.day !== day) continue;
       const cur = best.get(r.name);
       if (!cur || r.score > cur.score) best.set(r.name, r);
     }
     return [...best.values()].sort((a, b) => b.score - a.score).slice(0, limit);
   }
   const url =
-    `${SUPABASE_URL}/rest/v1/leaderboard?select=id,name,score,loops,orbs,max_combo,day,created_at,verified` +
-    `&day=eq.${encodeURIComponent(day)}&order=score.desc,created_at.asc&limit=${limit}`;
+    scope === "daily"
+      ? `${SUPABASE_URL}/rest/v1/leaderboard?select=id,name,score,loops,orbs,max_combo,day,created_at,verified` +
+        `&day=eq.${encodeURIComponent(day)}&order=score.desc,created_at.asc&limit=${limit}`
+      : `${SUPABASE_URL}/rest/v1/overall_leaderboard?select=name,score,total_score,games_played,total_loops,created_at` +
+        `&order=score.desc,created_at.asc&limit=${limit}`;
   const res = await fetch(url, { headers: headers() });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return res.json();

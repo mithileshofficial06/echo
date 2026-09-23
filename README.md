@@ -44,6 +44,28 @@ supabase/
   functions/submit-run/  server-side run verification
 ```
 
+## Shared player database and leaderboard
+
+The game ships with a Supabase schema for verified daily scores and persistent
+player profiles. A player enters their name once before playing; each completed
+daily run is then verified and saved automatically. The global board ranks each
+player by their all-time best score, while the Daily tab shows today's placement.
+
+1. Create a Supabase project.
+2. Run both files in `supabase/migrations/` in the Supabase SQL Editor, in file-name order.
+3. Copy `.env.example` to `.env.local`, then add the project URL and **anon** key.
+4. Bundle and deploy the verification function:
+
+   ```bash
+   npm run build:engine
+   supabase functions deploy submit-run
+   ```
+
+The edge function uses Supabase's built-in `SUPABASE_URL` and
+`SUPABASE_SERVICE_ROLE_KEY`; never put the service-role key in `.env.local` or
+in the browser. The database allows public reads for the leaderboard but only
+the verification function can create runs or alter lifetime player progress.
+
 ## Development
 
 ```bash
@@ -55,8 +77,3 @@ npm run test:determinism  # replays 50 bot runs and checks they re-simulate iden
 
 The game works fully offline; scores are then saved on the device. To enable the global leaderboard, copy `.env.example` to `.env.local` and fill in your Supabase URL and anon key.
 
-### Backend setup
-
-1. Apply `supabase/migrations/*.sql` to your Supabase project.
-2. Run `npm run build:engine` to bundle the game engine into the edge function.
-3. Deploy `supabase/functions/submit-run`. It uses the built-in `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` secrets.
