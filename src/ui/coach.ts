@@ -106,6 +106,8 @@ export class Coach {
     this.root.classList.add("on");
     this.root.classList.toggle("dim", step.dim ?? true);
     this.root.classList.toggle("no-target", !step.target);
+    // Without dimming the game is live: dock a compact bubble at the bottom so it never covers the path.
+    this.root.classList.toggle("docked", step.dim === false);
     this.spot.classList.toggle("circle", step.shape === "circle");
     this.kicker.textContent = step.kicker ?? "LIVE COACH";
     this.nextBtn.hidden = !step.action;
@@ -115,6 +117,8 @@ export class Coach {
     this.bubble.classList.add("pop");
     this.typeOut(step.text);
     if (!step.quiet) this.speak(step.text);
+    // On small screens the target can sit below the fold of a scrolling menu.
+    if (step.target instanceof HTMLElement) step.target.scrollIntoView({ block: "center", behavior: "smooth" });
     cancelAnimationFrame(this.raf);
     this.track();
   }
@@ -207,7 +211,7 @@ export class Coach {
     const bh = this.bubble.offsetHeight;
     let x: number;
     let y: number;
-    if (!r) {
+    if (!r || this.step?.dim === false) {
       x = (vw - bw) / 2;
       y = vh - bh - 40;
     } else {

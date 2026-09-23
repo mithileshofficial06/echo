@@ -1604,6 +1604,26 @@ button.coach-voice.off {
 .coach-actions .link {
   font-size: 10px;
   letter-spacing: 0.1em;
+  clip-path: none;
+}
+
+.coach.docked .coach-bubble {
+  width: min(460px, calc(100vw - 24px));
+  padding: 11px 16px 10px;
+  background: rgba(10, 17, 13, 0.88);
+}
+
+.coach.docked .coach-top {
+  margin-bottom: 5px;
+}
+
+.coach.docked .coach-text {
+  min-height: 0;
+  font-size: 14px;
+}
+
+.coach.docked .coach-actions {
+  margin-top: 6px;
 }
 
 .coach-actions .primary {
@@ -1612,6 +1632,13 @@ button.coach-voice.off {
   background: var(--signal);
   color: #0a120b;
   font-size: 12px;
+}
+
+.coach-actions .primary:hover,
+.coach-actions .primary:focus-visible {
+  border-color: #e6ffc2;
+  background: #e6ffc2;
+  color: #0a120b;
 }
 
 .coach-actions .primary[hidden] {
@@ -1891,5 +1918,39 @@ body.touch .coach-actions .primary small {
     animation-iteration-count: 1 !important;
     animation-delay: 0s !important;
     transition: none !important;
+  }
+}
+
+/* The signal-room refresh re-declares the desktop deck grid after the first
+   mobile block, so restate the stacked phone layout here. */
+@media (max-width: 760px) {
+  .launch-deck {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-intro {
+    border-right: 0;
+    border-bottom: 1px solid rgba(155, 219, 255, 0.13);
+  }
+
+  .deck-intro b {
+    max-width: none;
+  }
+
+  .menu-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .menu-buttons button {
+    border-right: 0;
+    border-bottom: 1px solid rgba(155, 219, 255, 0.13);
+  }
+
+  .deck-links {
+    grid-template-columns: 1fr 1fr 1fr;
+  }
+
+  .deck-links button {
+    justify-content: center;
   }
 }
