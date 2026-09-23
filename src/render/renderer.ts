@@ -85,6 +85,7 @@ export class Renderer {
 
     this.beginArena(sx, sy);
     this.drawArena(sim, opt.time);
+    this.drawTemporalField(sim, opt);
     this.drawOrbs(sim, opt.time);
     this.drawGhosts(sim, opt);
     this.drawPlayer(sim, opt);
@@ -182,6 +183,54 @@ export class Renderer {
       c.fill();
       c.restore();
     }
+  }
+
+  /**
+   * A quiet visual map of the timeline: every active echo bends the arena's
+   * signal around the player. It makes the central idea readable at a glance
+   * without adding a new rule or changing deterministic simulation.
+   */
+  private drawTemporalField(sim: Sim, opt: RenderOptions) {
+    const c = this.ctx;
+    const active = sim.activeGhosts;
+    const px = sim.prevX + (sim.px - sim.prevX) * opt.alpha;
+    const py = sim.prevY + (sim.py - sim.prevY) * opt.alpha;
+
+    c.save();
+    c.strokeStyle = ACCENT;
+    c.lineWidth = 1;
+    for (let ring = 0; ring < 3; ring++) {
+      const radius = 38 + ring * 27 + ((opt.time * 20 + ring * 11) % 27);
+      c.globalAlpha = 0.035 + active.length * 0.008;
+      c.setLineDash([2, 9]);
+      c.lineDashOffset = -opt.time * 12 - ring * 5;
+      c.beginPath();
+      c.arc(px, py, radius, 0, Math.PI * 2);
+      c.stroke();
+    }
+    c.setLineDash([]);
+
+    // Echoes form a temporary constellation with the living player.
+    if (active.length > 0) {
+      c.globalAlpha = Math.min(0.055 + active.length * 0.012, 0.16);
+      c.lineWidth = 1;
+      c.beginPath();
+      c.moveTo(px, py);
+      active.forEach((g) => {
+        const [x, y] = this.ghostRenderPos(sim, g, opt.alpha);
+        c.lineTo(x, y);
+        c.moveTo(px, py);
+      });
+      c.stroke();
+      active.forEach((g, i) => {
+        const [x, y] = this.ghostRenderPos(sim, g, opt.alpha);
+        c.globalAlpha = 0.14 + ((i + 1) / active.length) * 0.12;
+        c.beginPath();
+        c.arc(x, y, PLAYER_RADIUS + 5 + Math.sin(opt.time * 3 + i) * 2, 0, Math.PI * 2);
+        c.stroke();
+      });
+    }
+    c.restore();
   }
 
   private ghostIndex(sim: Sim): number {
@@ -296,6 +345,20 @@ export class Renderer {
     c.beginPath();
     c.arc(x, y, PLAYER_RADIUS, 0, Math.PI * 2);
     c.fill();
+    // A small directional cut makes the living player feel distinct from a ghost.
+    const dx = sim.px - sim.prevX;
+    const dy = sim.py - sim.prevY;
+    if (dx || dy) {
+      const a = Math.atan2(dy, dx);
+      c.rotate(a);
+      c.fillStyle = ACCENT;
+      c.beginPath();
+      c.moveTo(PLAYER_RADIUS + 7, 0);
+      c.lineTo(PLAYER_RADIUS + 1, -4);
+      c.lineTo(PLAYER_RADIUS + 1, 4);
+      c.closePath();
+      c.fill();
+    }
     c.restore();
   }
 

@@ -115,13 +115,15 @@ class App {
     const best = getBest();
     const node = el(`
       <div class="screen menu">
+        <div class="transmission" aria-hidden="true"><span>REC // 10.00s</span><i></i><span>PAST SELVES: LIVE</span></div>
         <h1 class="title" data-text="ECHO">ECHO</h1>
-        <p class="tag">every move you make comes back to haunt you</p>
+        <p class="tag">a ten-second survival ritual against your own recorded past</p>
+        <div class="manifesto"><span>01 / MOVE</span><span>02 / REPEAT</span><span>03 / SURVIVE</span></div>
         <div class="buttons">
-          <button class="primary" data-act="daily">PLAY DAILY <small>${this.day}</small></button>
-          <button data-act="practice">PRACTICE <small>random seed</small></button>
+          <button class="primary" data-act="daily">ENTER TODAY'S LOOP <small>${this.day}</small></button>
+          <button data-act="practice">OPEN A PRIVATE LOOP <small>random seed</small></button>
           <button data-act="board">LEADERBOARD</button>
-          <button data-act="how">HOW TO PLAY</button>
+          <button data-act="how">READ THE SIGNAL</button>
         </div>
         <div class="meta">
           ${best ? `<span>BEST <b>${fmt(best)}</b></span>` : ""}
