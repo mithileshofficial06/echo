@@ -123,27 +123,35 @@ class App {
 
   // ---------- Menu ----------
 
-  showMenu() {
+  /** animate=false re-renders in place (e.g. toggling sound) without replaying the entrance. */
+  showMenu(animate = true) {
     this.screen = "menu";
     this.ensureAttract();
     const best = getBest();
     const guideEntry = !this.hasSeenTutorial();
+    const motes = Array.from(
+      { length: 26 },
+      () =>
+        `<i style="--x:${(Math.random() * 100).toFixed(1)}%;--s:${(1 + Math.random() * 2.5).toFixed(1)}px;--t:${(9 + Math.random() * 12).toFixed(1)}s;--d:${(-Math.random() * 20).toFixed(1)}s"></i>`,
+    ).join("");
     const node = el(`
-      <div class="screen menu">
+      <div class="screen menu ${animate ? "menu-intro" : ""}">
         <div class="menu-haze" aria-hidden="true"></div>
+        <div class="menu-motes" aria-hidden="true">${motes}</div>
         <div class="menu-shell">
-          <header class="signal-head">
+          <div class="shell-scan" aria-hidden="true"></div>
+          <header class="signal-head enter" style="--d:0s">
             <div class="wordmark"><span class="wordmark-mark">E</span> ECHO <i>/</i> ARCHIVE</div>
             <div class="signal-state"><span></span> TEMPORAL LINK STABLE</div>
             <div class="signal-id">SYS.09 // ${this.day.replaceAll("-", ".")}</div>
           </header>
           <main class="hero-grid">
             <section class="hero-copy">
-              <div class="eyebrow"><span>01</span> SURVIVAL PROTOCOL</div>
-              <h1 class="title" data-text="ECHO">ECHO</h1>
-              <p class="tag">Your last ten seconds are not history.<br>They are the next thing hunting you.</p>
-              <div class="hero-facts">
-                <div><b>10.00</b><span>SECONDS / LOOP</span></div>
+              <div class="eyebrow enter" style="--d:0.15s"><span>01</span> SURVIVAL PROTOCOL</div>
+              <h1 class="title" data-text="ECHO">${[..."ECHO"].map((c, i) => `<span style="--i:${i}">${c}</span>`).join("")}</h1>
+              <p class="tag enter" style="--d:0.75s">Your last ten seconds are not history.<br>They are the next thing hunting you.</p>
+              <div class="hero-facts enter" style="--d:0.95s">
+                <div><b data-countdown>10.00</b><span>SECONDS / LOOP</span><em class="fact-bar"></em></div>
                 <div><b>∞</b><span>PAST SELVES</span></div>
                 <div><b>01</b><span>WAY OUT</span></div>
               </div>
@@ -151,12 +159,14 @@ class App {
             <section class="echo-vessel" aria-label="Animated echo field">
               <div class="vessel-label top">LIVE MEMORY MAP</div>
               <div class="vessel-label bottom">DO NOT COLLIDE WITH YOURSELF</div>
+              <div class="radar-sweep"></div>
               <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+              <div class="comet comet-one"><i></i></div><div class="comet comet-two"><i></i></div><div class="comet comet-three"><i></i></div>
               <div class="echo-node node-one"></div><div class="echo-node node-two"></div><div class="echo-node node-three"></div>
-              <div class="core-node"></div><div class="vessel-cross"></div>
+              <div class="core-node"></div><div class="core-pulse"></div><div class="vessel-cross"></div>
             </section>
           </main>
-          <section class="launch-deck">
+          <section class="launch-deck enter" style="--d:1.1s">
             <div class="deck-intro"><span>SELECT ENTRY</span><b>THE LOOP IS ALREADY RUNNING.</b></div>
             <div class="buttons menu-buttons">
               <button class="primary ${guideEntry ? "guided-entry" : ""}" data-act="daily"><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
@@ -168,7 +178,7 @@ class App {
               <button class="link" data-act="mute">${sound.muted ? "SOUND OFF" : "SOUND ON"}</button>
             </div>
           </section>
-          <footer class="menu-footer">
+          <footer class="menu-footer enter" style="--d:1.3s">
             <span>${best ? `PERSONAL BEST // ${fmt(best)}` : "NO MEMORY RECORDED YET"}</span>
             <span class="keys"><kbd>ENTER</kbd> BEGIN &nbsp; <kbd>WASD</kbd> MOVE &nbsp; <kbd>SPACE</kbd> FORGET</span>
           </footer>
@@ -183,12 +193,13 @@ class App {
         how: () => this.showHow(),
         mute: () => {
           sound.toggleMute();
-          this.showMenu();
+          this.showMenu(false);
         },
       },
       () => this.click(),
     );
     this.setLayer(node);
+    this.animateMenu(node);
     if (guideEntry) {
       this.coach.show({
         target: node.querySelector<HTMLElement>('[data-act="daily"]'),
@@ -196,6 +207,25 @@ class App {
         text: "Welcome to ECHO. Click Play the Daily Loop to begin. I'll guide you through your first run.",
       });
     }
+  }
+
+  /** Live bits of the landing view: a real 10s loop countdown and pointer parallax. */
+  private animateMenu(node: HTMLElement) {
+    const count = node.querySelector<HTMLElement>("[data-countdown]")!;
+    const start = performance.now();
+    const tick = (now: number) => {
+      if (!node.isConnected) return;
+      const t = ((now - start) / 1000) % 10;
+      count.textContent = (10 - t).toFixed(2);
+      node.style.setProperty("--loop", String(t / 10));
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+    node.addEventListener("pointermove", (e) => {
+      if (e.pointerType !== "mouse") return;
+      node.style.setProperty("--mx", ((e.clientX / window.innerWidth) * 2 - 1).toFixed(3));
+      node.style.setProperty("--my", ((e.clientY / window.innerHeight) * 2 - 1).toFixed(3));
+    });
   }
 
   showHow() {
@@ -478,7 +508,7 @@ class App {
 
   private skipTutorial() {
     this.finishTutorial();
-    if (this.screen === "menu") this.showMenu();
+    if (this.screen === "menu") this.showMenu(false);
     else if (this.screen === "play" && this.game?.state === "paused") {
       input.clear();
       this.game.resume();
@@ -751,7 +781,7 @@ class App {
     const k = e.code;
     if (k === "KeyM") {
       sound.toggleMute();
-      if (this.screen === "menu") this.showMenu();
+      if (this.screen === "menu") this.showMenu(false);
       return;
     }
     switch (this.screen) {
