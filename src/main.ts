@@ -23,7 +23,7 @@ import { downloadCanvas, memoryId, renderTapestry } from "./render/tapestry";
 import { bindActions, el, escapeHtml, fmt } from "./ui/dom";
 
 type Kind = "daily" | "practice";
-type Screen = "menu" | "how" | "identity" | "play" | "paused" | "over" | "board" | "replay";
+type Screen = "menu" | "how" | "identity" | "tutorial" | "play" | "paused" | "over" | "board" | "replay";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ui = document.getElementById("ui")!;
@@ -101,7 +101,7 @@ class App {
   }
 
   private isMenuLike(): boolean {
-    return this.screen === "menu" || this.screen === "how" || this.screen === "identity" || this.screen === "board";
+    return this.screen === "menu" || this.screen === "how" || this.screen === "identity" || this.screen === "tutorial" || this.screen === "board";
   }
 
   private ensureAttract() {
@@ -211,8 +211,13 @@ class App {
   // ---------- Playing ----------
 
   startRun(kind: Kind) {
+    this.kind = kind;
     if (!getName()) {
       this.showIdentity(kind);
+      return;
+    }
+    if (!this.hasSeenTutorial()) {
+      this.showTutorial(kind);
       return;
     }
     sound.unlock();
@@ -272,11 +277,64 @@ class App {
       }
       setName(name);
       this.click();
-      this.startRun(kind);
+      this.showTutorial(kind);
     });
     bindActions(node, { back: () => this.showMenu() }, () => this.click());
     this.setLayer(node);
     setTimeout(() => field.focus(), 0);
+  }
+
+  private hasSeenTutorial(): boolean {
+    try {
+      return localStorage.getItem("echo.tutorialSeen") === "1";
+    } catch {
+      return false;
+    }
+  }
+
+  private showTutorial(kind: Kind) {
+    this.screen = "tutorial";
+    this.ensureAttract();
+    const node = el(`
+      <div class="screen tutorial-screen">
+        <div class="tutorial-shell">
+          <div class="tutorial-kicker"><span>ONBOARDING // 01</span><b>LIVE TRAINING LOOP</b></div>
+          <div class="tutorial-heading">
+            <div>
+              <h2>LEARN THE ECHO</h2>
+              <p>Your past becomes an opponent. We will walk you through the first loop before the archive lets you loose.</p>
+            </div>
+            <div class="tutorial-progress" aria-label="4 tutorial steps"><i></i><i></i><i></i><i></i></div>
+          </div>
+          <div class="tutorial-steps">
+            <article class="tutorial-step"><span class="step-no">01</span><strong>MOVE</strong><p>Use <kbd>WASD</kbd> or the arrow keys. On touch, drag anywhere in the arena.</p><div class="step-glyph glyph-move">＋</div></article>
+            <article class="tutorial-step"><span class="step-no">02</span><strong>COLLECT</strong><p>Chase the ◆ orbs. You need the quota before the 10-second loop closes.</p><div class="step-glyph glyph-orb">◆</div></article>
+            <article class="tutorial-step"><span class="step-no">03</span><strong>AVOID YOUR ECHO</strong><p>At the next loop, your old path returns. Brush past it for SYNC. Never collide.</p><div class="step-glyph glyph-echo">◌</div></article>
+            <article class="tutorial-step"><span class="step-no">04</span><strong>FORGET</strong><p>Every few loops, press <kbd>SPACE</kbd> to erase your oldest echo when the field gets crowded.</p><div class="step-glyph glyph-forget">×</div></article>
+          </div>
+          <div class="tutorial-footer">
+            <span><b>TRAINING MODE</b> &nbsp; guided hints appear as you play</span>
+            <div class="row"><button class="link" data-act="back">BACK</button><button class="primary" data-act="begin">BEGIN ${kind === "daily" ? "DAILY" : "PRACTICE"} LOOP <small>ENTER →</small></button></div>
+          </div>
+        </div>
+      </div>`);
+    bindActions(
+      node,
+      {
+        back: () => this.showMenu(),
+        begin: () => {
+          try {
+            localStorage.setItem("echo.tutorialSeen", "1");
+          } catch {
+            /* ignore */
+          }
+          this.click();
+          this.startRun(kind);
+        },
+      },
+      () => this.click(),
+    );
+    this.setLayer(node);
   }
 
   private onGameEvent(e: SimEvent, sim: Sim, tutorial: boolean) {
@@ -586,6 +644,17 @@ class App {
         break;
       case "identity":
         if (k === "Escape") this.showMenu();
+        break;
+      case "tutorial":
+        if (k === "Escape") this.showMenu();
+        else if (k === "Enter") {
+          try {
+            localStorage.setItem("echo.tutorialSeen", "1");
+          } catch {
+            /* ignore */
+          }
+          this.startRun(this.kind);
+        }
         break;
     }
   }

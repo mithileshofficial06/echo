@@ -1162,6 +1162,161 @@ body::before {
   color: var(--signal);
 }
 
+.tutorial-screen {
+  justify-content: center;
+  padding: clamp(20px, 4vw, 56px);
+}
+
+.tutorial-shell {
+  width: min(1040px, 100%);
+  border: 1px solid rgba(244, 245, 239, 0.2);
+  background: rgba(9, 13, 19, 0.9);
+  box-shadow: 18px 18px 0 rgba(85, 233, 242, 0.06), 0 30px 100px rgba(0, 0, 0, 0.45);
+}
+
+.tutorial-kicker,
+.tutorial-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 28px;
+  border-bottom: 1px solid rgba(244, 245, 239, 0.14);
+  color: var(--dim);
+  font-size: 10px;
+  letter-spacing: 0.15em;
+}
+
+.tutorial-kicker span,
+.tutorial-footer b {
+  color: var(--signal);
+}
+
+.tutorial-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 28px;
+  padding: clamp(30px, 5vw, 58px) clamp(28px, 6vw, 72px) 32px;
+}
+
+.tutorial-heading h2 {
+  color: var(--fg);
+  font-family: var(--display);
+  font-size: clamp(34px, 6vw, 72px);
+  letter-spacing: -0.06em;
+  line-height: 0.95;
+}
+
+.tutorial-heading p {
+  max-width: 570px;
+  margin-top: 18px;
+  color: rgba(244, 245, 239, 0.62);
+  font-family: var(--display);
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.tutorial-progress {
+  display: flex;
+  gap: 7px;
+  padding-bottom: 8px;
+}
+
+.tutorial-progress i {
+  display: block;
+  width: 34px;
+  height: 4px;
+  background: rgba(244, 245, 239, 0.18);
+}
+
+.tutorial-progress i:first-child,
+.tutorial-progress i:nth-child(2) {
+  background: var(--accent);
+}
+
+.tutorial-steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  border-top: 1px solid rgba(244, 245, 239, 0.14);
+  border-bottom: 1px solid rgba(244, 245, 239, 0.14);
+}
+
+.tutorial-step {
+  position: relative;
+  min-height: 230px;
+  padding: 24px 22px 18px;
+  border-right: 1px solid rgba(244, 245, 239, 0.14);
+  overflow: hidden;
+}
+
+.tutorial-step:last-child {
+  border-right: 0;
+}
+
+.tutorial-step:hover {
+  background: rgba(85, 233, 242, 0.07);
+}
+
+.step-no {
+  display: block;
+  margin-bottom: 34px;
+  color: var(--signal);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+}
+
+.tutorial-step strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-family: var(--display);
+  font-size: 17px;
+  letter-spacing: 0.04em;
+}
+
+.tutorial-step p {
+  position: relative;
+  z-index: 1;
+  max-width: 190px;
+  margin-top: 10px;
+  color: var(--dim);
+  font-size: 11px;
+  line-height: 1.6;
+}
+
+.step-glyph {
+  position: absolute;
+  right: 12px;
+  bottom: -18px;
+  color: rgba(85, 233, 242, 0.14);
+  font-family: var(--display);
+  font-size: 112px;
+  line-height: 1;
+}
+
+.glyph-orb,
+.glyph-forget {
+  color: rgba(183, 243, 107, 0.16);
+}
+
+.tutorial-footer {
+  border-bottom: 0;
+  padding: 18px 28px;
+}
+
+.tutorial-footer .row {
+  flex-wrap: nowrap;
+}
+
+.tutorial-footer .link {
+  color: var(--dim);
+}
+
+.tutorial-footer button.primary {
+  min-width: 220px;
+}
+
 @media (max-width: 760px) {
   .screen.menu {
     padding: 0;
@@ -1216,5 +1371,64 @@ body::before {
 
   .deck-links {
     padding: 13px 18px;
+  }
+
+  .tutorial-screen {
+    justify-content: flex-start;
+    padding: 16px;
+  }
+
+  .tutorial-kicker,
+  .tutorial-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 16px 18px;
+  }
+
+  .tutorial-heading {
+    display: block;
+    padding: 30px 18px 24px;
+  }
+
+  .tutorial-heading h2 {
+    font-size: 42px;
+  }
+
+  .tutorial-heading p {
+    font-size: 14px;
+  }
+
+  .tutorial-progress {
+    margin-top: 24px;
+  }
+
+  .tutorial-steps {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tutorial-step {
+    min-height: 205px;
+    padding: 18px 16px;
+  }
+
+  .tutorial-step:nth-child(2) {
+    border-right: 0;
+  }
+
+  .tutorial-step:nth-child(-n + 2) {
+    border-bottom: 1px solid rgba(244, 245, 239, 0.14);
+  }
+
+  .tutorial-step p {
+    font-size: 10px;
+  }
+
+  .tutorial-footer .row {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .tutorial-footer button.primary {
+    min-width: 0;
   }
 }
