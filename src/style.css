@@ -1078,6 +1078,45 @@ body::before {
   transform: translateY(-3px);
 }
 
+.menu-buttons .guided-entry {
+  position: relative;
+  z-index: 2;
+  border: 2px solid var(--signal);
+  box-shadow: 0 0 0 5px rgba(183, 243, 107, 0.12), 0 0 34px rgba(183, 243, 107, 0.2);
+  animation: guided-entry-pulse 1.8s ease-in-out infinite;
+}
+
+.menu-buttons .guided-entry::after {
+  position: absolute;
+  top: -42px;
+  right: 18px;
+  padding: 7px 10px;
+  border: 1px solid var(--signal);
+  background: #111a16;
+  color: var(--signal);
+  content: attr(data-coach);
+  font-size: 9px;
+  letter-spacing: 0.13em;
+  white-space: nowrap;
+  box-shadow: 5px 5px 0 rgba(183, 243, 107, 0.12);
+}
+
+.menu-buttons .guided-entry::before {
+  position: absolute;
+  top: -12px;
+  right: 40px;
+  width: 1px;
+  height: 12px;
+  background: var(--signal);
+  content: "";
+}
+
+@keyframes guided-entry-pulse {
+  0%,
+  100% { box-shadow: 0 0 0 5px rgba(183, 243, 107, 0.12), 0 0 28px rgba(183, 243, 107, 0.14); }
+  50% { box-shadow: 0 0 0 9px rgba(183, 243, 107, 0.06), 0 0 42px rgba(183, 243, 107, 0.28); }
+}
+
 .menu-buttons button span {
   font-size: 12px;
   letter-spacing: 0.13em;

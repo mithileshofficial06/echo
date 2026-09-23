@@ -23,7 +23,7 @@ import { downloadCanvas, memoryId, renderTapestry } from "./render/tapestry";
 import { bindActions, el, escapeHtml, fmt } from "./ui/dom";
 
 type Kind = "daily" | "practice";
-type Screen = "menu" | "how" | "identity" | "tutorial" | "play" | "paused" | "over" | "board" | "replay";
+type Screen = "menu" | "how" | "identity" | "play" | "paused" | "over" | "board" | "replay";
 
 const canvas = document.getElementById("game") as HTMLCanvasElement;
 const ui = document.getElementById("ui")!;
@@ -47,6 +47,7 @@ class App {
   private runsPlayed = 0;
   private boardDay = dailyKey();
   private boardScope: LeaderboardScope = "overall";
+  private guidedRun = false;
 
   constructor() {
     ui.append(forgetBtn, pauseBtn, hint);
@@ -101,7 +102,7 @@ class App {
   }
 
   private isMenuLike(): boolean {
-    return this.screen === "menu" || this.screen === "how" || this.screen === "identity" || this.screen === "tutorial" || this.screen === "board";
+    return this.screen === "menu" || this.screen === "how" || this.screen === "identity" || this.screen === "board";
   }
 
   private ensureAttract() {
@@ -114,6 +115,7 @@ class App {
     this.screen = "menu";
     this.ensureAttract();
     const best = getBest();
+    const guideEntry = !this.hasSeenTutorial();
     const node = el(`
       <div class="screen menu">
         <div class="menu-haze" aria-hidden="true"></div>
@@ -145,7 +147,7 @@ class App {
           <section class="launch-deck">
             <div class="deck-intro"><span>SELECT ENTRY</span><b>THE LOOP IS ALREADY RUNNING.</b></div>
             <div class="buttons menu-buttons">
-              <button class="primary" data-act="daily"><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
+              <button class="primary ${guideEntry ? "guided-entry" : ""}" data-act="daily" ${guideEntry ? 'data-coach="START HERE · CLICK THIS"' : ""}><span>PLAY THE DAILY LOOP</span><small>${this.day} <b>→</b></small></button>
               <button data-act="practice"><span>CREATE PRIVATE LOOP</span><small>RANDOM SEED <b>→</b></small></button>
             </div>
             <div class="deck-links">
@@ -216,10 +218,7 @@ class App {
       this.showIdentity(kind);
       return;
     }
-    if (!this.hasSeenTutorial()) {
-      this.showTutorial(kind);
-      return;
-    }
+    this.guidedRun = !this.hasSeenTutorial();
     sound.unlock();
     this.kind = kind;
     this.day = dailyKey();
@@ -240,8 +239,8 @@ class App {
       onOver: (r) => this.showGameOver(r),
     });
     this.showHint(
-      tutorial ? "Collect ◆ orbs. You need 1 before the loop ends." : `${kind === "daily" ? "DAILY " + this.day : "PRACTICE"}`,
-      tutorial ? 5000 : 1800,
+      this.guidedRun ? "Move with WASD or the arrows. Chase the glowing ◆ orb." : tutorial ? "Collect ◆ orbs. You need 1 before the loop ends." : `${kind === "daily" ? "DAILY " + this.day : "PRACTICE"}`,
+      this.guidedRun ? 7000 : tutorial ? 5000 : 1800,
     );
   }
 
@@ -277,7 +276,7 @@ class App {
       }
       setName(name);
       this.click();
-      this.showTutorial(kind);
+      this.startRun(kind);
     });
     bindActions(node, { back: () => this.showMenu() }, () => this.click());
     this.setLayer(node);
@@ -292,57 +291,20 @@ class App {
     }
   }
 
-  private showTutorial(kind: Kind) {
-    this.screen = "tutorial";
-    this.ensureAttract();
-    const node = el(`
-      <div class="screen tutorial-screen">
-        <div class="tutorial-shell">
-          <div class="tutorial-kicker"><span>ONBOARDING // 01</span><b>LIVE TRAINING LOOP</b></div>
-          <div class="tutorial-heading">
-            <div>
-              <h2>LEARN THE ECHO</h2>
-              <p>Your past becomes an opponent. We will walk you through the first loop before the archive lets you loose.</p>
-            </div>
-            <div class="tutorial-progress" aria-label="4 tutorial steps"><i></i><i></i><i></i><i></i></div>
-          </div>
-          <div class="tutorial-steps">
-            <article class="tutorial-step"><span class="step-no">01</span><strong>MOVE</strong><p>Use <kbd>WASD</kbd> or the arrow keys. On touch, drag anywhere in the arena.</p><div class="step-glyph glyph-move">＋</div></article>
-            <article class="tutorial-step"><span class="step-no">02</span><strong>COLLECT</strong><p>Chase the ◆ orbs. You need the quota before the 10-second loop closes.</p><div class="step-glyph glyph-orb">◆</div></article>
-            <article class="tutorial-step"><span class="step-no">03</span><strong>AVOID YOUR ECHO</strong><p>At the next loop, your old path returns. Brush past it for SYNC. Never collide.</p><div class="step-glyph glyph-echo">◌</div></article>
-            <article class="tutorial-step"><span class="step-no">04</span><strong>FORGET</strong><p>Every few loops, press <kbd>SPACE</kbd> to erase your oldest echo when the field gets crowded.</p><div class="step-glyph glyph-forget">×</div></article>
-          </div>
-          <div class="tutorial-footer">
-            <span><b>TRAINING MODE</b> &nbsp; guided hints appear as you play</span>
-            <div class="row"><button class="link" data-act="back">BACK</button><button class="primary" data-act="begin">BEGIN ${kind === "daily" ? "DAILY" : "PRACTICE"} LOOP <small>ENTER →</small></button></div>
-          </div>
-        </div>
-      </div>`);
-    bindActions(
-      node,
-      {
-        back: () => this.showMenu(),
-        begin: () => {
-          try {
-            localStorage.setItem("echo.tutorialSeen", "1");
-          } catch {
-            /* ignore */
-          }
-          this.click();
-          this.startRun(kind);
-        },
-      },
-      () => this.click(),
-    );
-    this.setLayer(node);
-  }
-
   private onGameEvent(e: SimEvent, sim: Sim, tutorial: boolean) {
     if (e.type === "death") this.lastDeath = { cause: e.cause, loop: e.ghost?.loop };
     if (e.type !== "loop") return;
     const quotaUp = orbQuota(e.loop) > orbQuota(e.loop - 1);
     const touch = input.touchUsed;
-    if (tutorial && e.loop === 2) {
+    if (this.guidedRun && e.loop === 1) {
+      try {
+        localStorage.setItem("echo.tutorialSeen", "1");
+      } catch {
+        /* ignore */
+      }
+      this.guidedRun = false;
+      this.showHint("Loop 1 complete. That glowing path is your echo now. Keep moving and don't touch it.", 6500);
+    } else if (tutorial && e.loop === 2) {
       this.showHint("That's you, 10 seconds ago. Don't touch it. Brush past it for SYNC.", 5500);
     } else if (e.charged && sim.forgetCharges === 1 && (tutorial || e.loop === 4)) {
       this.showHint(`FORGET charged: ${touch ? "tap FORGET" : "press SPACE"} to erase your oldest echo.`, 4500);
@@ -644,17 +606,6 @@ class App {
         break;
       case "identity":
         if (k === "Escape") this.showMenu();
-        break;
-      case "tutorial":
-        if (k === "Escape") this.showMenu();
-        else if (k === "Enter") {
-          try {
-            localStorage.setItem("echo.tutorialSeen", "1");
-          } catch {
-            /* ignore */
-          }
-          this.startRun(this.kind);
-        }
         break;
     }
   }
