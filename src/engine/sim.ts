@@ -66,7 +66,7 @@ export interface RunSummary {
 
 /**
  * Pure, deterministic ECHO simulation. Same seed + same input sequence
- * always produces the same run, which powers replays and score verification.
+ * always produces the same run, which powers replays.
  */
 export class Sim {
   readonly seed: number;
@@ -302,7 +302,7 @@ export class Sim {
   }
 }
 
-/** Re-run a whole game from its seed and inputs. Used for replays and verification. */
+/** Re-run a whole game from its seed and inputs. Used for replays and the determinism test. */
 export function simulate(seed: number, inputs: ArrayLike<number>): RunSummary & { dead: boolean } {
   const sim = new Sim(seed);
   for (let i = 0; i < inputs.length && !sim.dead; i++) sim.step(inputs[i]);

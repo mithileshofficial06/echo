@@ -8,7 +8,6 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "build:engine": "esbuild src/engine/index.ts --bundle --format=esm --target=es2022 --outfile=supabase/functions/submit-run/engine.js",
     "test:determinism": "esbuild scripts/determinism.ts --bundle --platform=node --outfile=node_modules/.cache/determinism.cjs --log-level=warning && node node_modules/.cache/determinism.cjs"
   },
   "dependencies": {

@@ -20,51 +20,26 @@ ECHO is a browser arcade game about surviving your own past. Each loop lasts 10 
 
 - **The music loops with you.** A loop is exactly 4 bars at 96 BPM. Every living echo adds a layer to the track, and forgetting one removes it. All audio is synthesized live with WebAudio, so the game ships no audio files.
 - **Your run becomes a picture.** On game over, every loop's path is painted into a *memory*, a unique image you can save and share.
-- **The leaderboard is made of echoes too.** Everyone plays the same daily seed. Every run on the board can be watched as a full replay.
-- **Scores can't be faked.** The game is fully deterministic (fixed 60 Hz timestep and a seeded RNG). The client only submits its input log. The server re-simulates the whole run with the same engine code and computes the score itself.
+- **The leaderboard is made of echoes too.** Everyone plays the same daily seed. Every run on the board is stored as its input log and can be watched as a full replay.
+- **Fully deterministic.** A fixed 60 Hz timestep and a seeded RNG mean the same seed and inputs always produce the same run, which is what makes replays possible.
+- **No backend.** No accounts, database, API keys or environment variables. Scores, replays and your name are kept in the browser's localStorage.
 
 ## Tech
 
 - **Next.js + TypeScript + Canvas 2D**, with no game framework. About 16 KB of game JS gzipped.
 - **WebAudio** for all music and sound effects.
-- **Supabase** for the leaderboard: a Postgres `runs` table (public read, no client writes) and a `submit-run` edge function that verifies runs.
-- **Vercel** for hosting the Next.js app.
+- **Static hosting.** The app prerenders to a single static page, so it deploys to Vercel (or any Next.js host) with zero configuration.
 
 ```
 src/
   engine/     deterministic simulation: sim, seeded RNG, input log encoding
   render/     canvas renderer, effects, memory image
   audio/      WebAudio music sequencer and sfx
-  net/        leaderboard client (Supabase REST, offline fallback)
-  ui/         DOM helpers
+  net/        leaderboard, name and personal best (browser localStorage)
+  ui/         DOM helpers and the first-run coach
   game.ts     fixed-timestep game controller
   main.ts     app shell and screens
-supabase/
-  migrations/ runs table + leaderboard view
-  functions/submit-run/  server-side run verification
 ```
-
-## Shared player database and leaderboard
-
-The game ships with a Supabase schema for verified daily scores and persistent
-player profiles. A player enters their name once before playing; each completed
-daily run is then verified and saved automatically. The global board ranks each
-player by their all-time best score, while the Daily tab shows today's placement.
-
-1. Create a Supabase project.
-2. Run both files in `supabase/migrations/` in the Supabase SQL Editor, in file-name order.
-3. Copy `.env.example` to `.env.local`, then add the project URL and **anon** key.
-4. Bundle and deploy the verification function:
-
-   ```bash
-   npm run build:engine
-   supabase functions deploy submit-run
-   ```
-
-The edge function uses Supabase's built-in `SUPABASE_URL` and
-`SUPABASE_SERVICE_ROLE_KEY`; never put the service-role key in `.env.local` or
-in the browser. The database allows public reads for the leaderboard but only
-the verification function can create runs or alter lifetime player progress.
 
 ## Development
 
@@ -76,5 +51,12 @@ npm run start             # serve the production build
 npm run test:determinism  # replays 50 bot runs and checks they re-simulate identically
 ```
 
-The game works fully offline; scores are then saved on the device. To enable the global leaderboard, copy `.env.example` to `.env.local` and fill in `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+## Deploy
+
+There is nothing to configure. Import the repository into Vercel and it
+detects Next.js automatically (build `npm run build`, no environment
+variables). Any host that runs `npm run build && npm run start` works too.
+
+First-time players get a guided tour through loop one. To see it again,
+remove `echo.tutorialSeen` from the site's localStorage.
 

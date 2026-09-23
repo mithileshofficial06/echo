@@ -11,7 +11,6 @@ import {
   fetchTop,
   getBest,
   getName,
-  online,
   setBest,
   setName,
   submitRun,
@@ -280,7 +279,7 @@ class App {
 
     const tutorial = this.runsPlayed < 2;
     // Dev-only: ?bot lets the attract bot play a real run (for testing late loops).
-      const devBot = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).has("bot");
+    const devBot = process.env.NODE_ENV === "development" && new URLSearchParams(location.search).has("bot");
     this.game = new Game(renderer, input, sound, {
       seed,
       source: devBot ? createBot() : undefined,
@@ -295,7 +294,7 @@ class App {
       );
   }
 
-  /** Names are collected before the run so verified daily scores can save automatically. */
+  /** Names are collected before the run so daily scores can save automatically. */
   private showIdentity(kind: Kind) {
     this.screen = "identity";
     this.ensureAttract();
@@ -304,7 +303,7 @@ class App {
         <div class="identity-card">
           <div class="identity-index">PLAYER REGISTRY // REQUIRED</div>
           <h2>NAME YOUR ECHO</h2>
-          <p>Every verified daily run is saved to this name. It is shown on the global leaderboard.</p>
+          <p>Every daily run is saved to this name on the leaderboard in this browser.</p>
           <form class="identity-form">
             <input name="name" maxlength="16" autocomplete="nickname" placeholder="ENTER A NAME" autofocus />
             <button class="primary" type="submit">BEGIN LOOP <small>→</small></button>
@@ -336,7 +335,7 @@ class App {
       this.coach.show({
         target: form,
         kicker: "FIRST, A NAME",
-        text: "Give your echo a name. It appears on the global leaderboard. Type it, then press Begin Loop.",
+        text: "Give your echo a name. It goes on your leaderboard. Type it, then press Begin Loop.",
       });
     }
   }
@@ -603,11 +602,7 @@ class App {
               <div class="stat"><span>BEST SYNC</span><b>x${s.maxCombo}</b></div>
               <div class="stat"><span>FORGETS</span><b>${s.forgets}</b></div>
             </div>
-            ${
-              kind === "daily"
-                ? `<div class="status">Preparing verified score for ${escapeHtml(name)}…</div>`
-                : `<div class="status">Practice runs aren't ranked. Play DAILY to get on the board.</div>`
-            }
+            ${kind === "daily" ? "" : `<div class="status">Practice runs aren't ranked. Play DAILY to get on the board.</div>`}
             <div class="status" data-status></div>
             <div class="actions">
               <button class="primary" data-act="retry">RETRY <small>R</small></button>
@@ -640,16 +635,16 @@ class App {
       // every daily game can save itself as soon as it is over.
       void (async () => {
         status.className = "status";
-        status.textContent = online ? "Verifying score and updating global placement…" : "Saving on this device…";
+        status.textContent = `Saving score for ${name}…`;
         const res = await submitRun(name, day, sim.seed, inputs, s);
         if (this.screen !== "over" || this.layer !== node) return;
         if (res.ok) {
           status.className = "status good";
           const ranks = [res.rank && `TODAY #${res.rank}`, res.overallRank && `ALL-TIME #${res.overallRank}`].filter(Boolean).join("  ·  ");
-          status.textContent = `${ranks || "SAVED"}${online ? " · global score updated" : " · saved on this device"}`;
+          status.textContent = `${ranks || "SAVED"} · saved on this device`;
         } else {
           status.className = "status bad";
-          status.textContent = res.error || "Could not save score. Check your connection and retry.";
+          status.textContent = res.error || "Could not save score on this device.";
         }
       })();
     }
@@ -708,14 +703,14 @@ class App {
           <div class="board-head">
             <button data-act="prev" ${scope === "overall" ? "disabled" : ""}>‹</button>
             <div>
-              <h2>${scope === "overall" ? "GLOBAL ARCHIVE" : "DAILY LOOP"}</h2>
+              <h2>${scope === "overall" ? "ALL-TIME ARCHIVE" : "DAILY LOOP"}</h2>
               <div class="day">${scope === "overall" ? "ALL-TIME PLACEMENT" : `${day === today ? "TODAY · " : ""}${day}`}</div>
             </div>
             <button data-act="next" ${scope === "overall" || day >= today ? "disabled" : ""}>›</button>
           </div>
           <div class="board-tabs"><button class="${scope === "overall" ? "on" : ""}" data-act="overall">ALL-TIME</button><button class="${scope === "daily" ? "on" : ""}" data-act="dailyboard">TODAY</button></div>
           <div class="board-list"><div class="empty">Loading…</div></div>
-          <div class="meta">${online ? "Every score is verified by replaying the run." : "Offline mode: scores are saved on this device only."}</div>
+          <div class="meta">Scores and replays are saved in this browser only.</div>
           <div class="row">
             <button class="primary" data-act="play">PLAY TODAY</button>
             <button data-act="back">BACK</button>
@@ -756,9 +751,9 @@ class App {
         <div class="board-row ${me && r.name === me ? "me" : ""}">
           <span class="rank">${String(i + 1).padStart(2, "0")}</span>
           <span class="name">${escapeHtml(r.name)}</span>
-          <span class="loops">${scope === "overall" ? `${r.games_played ?? 0} runs` : `${r.loops} loops`}</span>
+          <span class="loops">${scope === "overall" ? `${r.games_played ?? 0} run${r.games_played === 1 ? "" : "s"}` : `${r.loops} loops`}</span>
           <span class="score">${fmt(r.score)}</span>
-          ${scope === "daily" ? `<button title="Watch replay" aria-label="Watch replay">▶</button>` : `<span></span>`}
+          <button title="Watch replay" aria-label="Watch replay">▶</button>
         </div>`);
       row.querySelector("button")?.addEventListener("click", async () => {
         this.click();
