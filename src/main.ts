@@ -50,6 +50,7 @@ class App {
   private runsPlayed = 0;
   private boardDay = dailyKey();
   private boardScope: LeaderboardScope = "overall";
+  private menuScope: LeaderboardScope = "overall";
   private guidedRun = false;
   private guideStage: GuideStage = "off";
   /** The intro walkthrough plays once per session; retries skip straight to moving. */
@@ -156,15 +157,26 @@ class App {
                 <div><b>01</b><span>WAY OUT</span></div>
               </div>
             </section>
-            <section class="echo-vessel" aria-label="Animated echo field">
-              <div class="vessel-label top">LIVE MEMORY MAP</div>
-              <div class="vessel-label bottom">DO NOT COLLIDE WITH YOURSELF</div>
-              <div class="radar-sweep"></div>
-              <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
-              <div class="comet comet-one"><i></i></div><div class="comet comet-two"><i></i></div><div class="comet comet-three"><i></i></div>
-              <div class="echo-node node-one"></div><div class="echo-node node-two"></div><div class="echo-node node-three"></div>
-              <div class="core-node"></div><div class="core-pulse"></div><div class="vessel-cross"></div>
-            </section>
+            <aside class="menu-side">
+              <section class="echo-vessel" aria-hidden="true">
+                <div class="radar-sweep"></div>
+                <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div>
+                <div class="comet comet-one"><i></i></div><div class="comet comet-two"><i></i></div><div class="comet comet-three"><i></i></div>
+                <div class="echo-node node-one"></div><div class="echo-node node-two"></div><div class="echo-node node-three"></div>
+                <div class="core-node"></div><div class="core-pulse"></div><div class="vessel-cross"></div>
+              </section>
+              <section class="live-board enter" style="--d:0.6s" aria-label="Leaderboard">
+                <div class="lb-head">
+                  <span class="lb-title"><i></i>${online ? "GLOBAL LEADERBOARD" : "LEADERBOARD"}</span>
+                  <div class="lb-tabs">
+                    <button data-scope="overall" class="${this.menuScope === "overall" ? "on" : ""}">ALL-TIME</button>
+                    <button data-scope="daily" class="${this.menuScope === "daily" ? "on" : ""}">TODAY</button>
+                  </div>
+                </div>
+                <ol class="lb-list"><li class="lb-empty">Loading…</li></ol>
+                <button class="lb-more" data-act="board">FULL LEADERBOARD <b>→</b></button>
+              </section>
+            </aside>
           </main>
           <section class="launch-deck enter" style="--d:1.1s">
             <div class="deck-intro"><span>SELECT ENTRY</span><b>THE LOOP IS ALREADY RUNNING.</b></div>
@@ -189,7 +201,7 @@ class App {
       {
         daily: () => this.startRun("daily"),
         practice: () => this.startRun("practice"),
-        board: () => this.showBoard(this.day),
+        board: () => this.showBoard(this.day, this.menuScope),
         how: () => this.showHow(),
         mute: () => {
           sound.toggleMute();
@@ -200,6 +212,15 @@ class App {
     );
     this.setLayer(node);
     this.animateMenu(node);
+    node.querySelectorAll<HTMLButtonElement>("[data-scope]").forEach((b) =>
+      b.addEventListener("click", () => {
+        this.click();
+        this.menuScope = b.dataset.scope as LeaderboardScope;
+        node.querySelectorAll("[data-scope]").forEach((x) => x.classList.toggle("on", x === b));
+        void this.fillMenuBoard(node);
+      }),
+    );
+    void this.fillMenuBoard(node);
     if (guideEntry) {
       this.coach.show({
         target: node.querySelector<HTMLElement>('[data-act="daily"]'),
@@ -207,6 +228,45 @@ class App {
         text: "Welcome to ECHO. Click Play the Daily Loop to begin. I'll guide you through your first run.",
       });
     }
+  }
+
+  /** Top of the leaderboard in the landing view's side panel. */
+  private async fillMenuBoard(node: HTMLElement) {
+    const scope = this.menuScope;
+    const list = node.querySelector<HTMLElement>(".lb-list")!;
+    let rows: LeaderboardEntry[];
+    try {
+      rows = await fetchTop(this.day, 7, scope);
+    } catch {
+      if (node.isConnected && this.menuScope === scope) list.innerHTML = `<li class="lb-empty">Couldn't reach the leaderboard.</li>`;
+      return;
+    }
+    if (!node.isConnected || this.menuScope !== scope) return;
+    if (!rows.length) {
+      list.innerHTML = `<li class="lb-empty">${scope === "daily" ? "No runs today yet." : "The board is empty."} Be the first echo.</li>`;
+      return;
+    }
+    const me = getName();
+    list.innerHTML = "";
+    rows.forEach((r, i) => {
+      const row = el(`
+        <li class="lb-row ${me && r.name === me ? "me" : ""}">
+          <span class="rank">${String(i + 1).padStart(2, "0")}</span>
+          <span class="name">${escapeHtml(r.name)}</span>
+          <span class="score">${fmt(r.score)}</span>
+          ${r.id ? `<button title="Watch replay" aria-label="Watch ${escapeHtml(r.name)}'s replay">▶</button>` : "<span></span>"}
+        </li>`);
+      row.querySelector("button")?.addEventListener("click", async () => {
+        this.click();
+        try {
+          const rep = await fetchReplay(r.id!);
+          this.startReplay(rep.seed, rep.inputs, rep.name, () => this.showMenu());
+        } catch {
+          row.querySelector("button")!.textContent = "✕";
+        }
+      });
+      list.append(row);
+    });
   }
 
   /** Live bits of the landing view: a real 10s loop countdown and pointer parallax. */
@@ -244,6 +304,25 @@ class App {
           <div class="rule"><div class="icon">✕</div><b>FORGET</b>
             <p>Erase your oldest echo. You earn one charge every 3 loops. Choose wisely.</p></div>
         </div>
+        <section class="how-board">
+          <div class="how-board-head">
+            <div class="icon">⌁</div>
+            <div>
+              <b>THE LEADERBOARD</b>
+              <p>${online ? "One board for every player in the world." : "Your runs in this browser, ranked."} Your name goes on it when you play the Daily Loop.</p>
+            </div>
+          </div>
+          <div class="how-board-grid">
+            <div><b>TODAY</b><p>Everyone gets the same arena and the same orbs each day. Your best run of the day is ranked. A new loop opens at midnight UTC.</p></div>
+            <div><b>ALL-TIME</b><p>Your best score ever, plus how many runs you've played. It's always live on the home screen.</p></div>
+            <div><b>${online ? "VERIFIED" : "ON THIS DEVICE"}</b><p>${
+              online
+                ? "Your game only sends your moves. The server replays them to work out your score, so it can't be faked."
+                : "Scores and replays are kept in this browser until a leaderboard server is connected."
+            }</p></div>
+            <div><b>REPLAYS ▶</b><p>Press ▶ next to any name to watch that exact run, move for move. Private loops are practice and aren't ranked.</p></div>
+          </div>
+        </section>
         <div class="meta">
           <span><kbd>WASD</kbd> / <kbd>ARROWS</kbd> move</span>
           <span><kbd>SPACE</kbd> forget</span>
@@ -481,7 +560,15 @@ class App {
           { target: this.ghostTarget, shape: "circle", kicker: "YOUR ECHO", action: "NEXT", text: "Meet your echo. That's you from the last loop, repeating every move you just made." },
           { target: this.ghostTarget, shape: "circle", kicker: "DON'T TOUCH", action: "NEXT", text: "If it touches you, the run is over. But brushing close past it without touching builds SYNC, a combo that multiplies your points." },
           { target: () => renderer.hudRect("orbs"), kicker: "IT GETS HARDER", action: "NEXT", text: "Every loop adds another echo, and you still need orbs each time. The arena fills up fast." },
-          { target: null, kicker: "YOU'RE READY", action: "PLAY", text: "That's everything. Survive as many loops as you can. Good luck!" },
+          {
+            target: null,
+            kicker: "YOU'RE READY",
+            action: "PLAY",
+            text:
+              this.kind === "daily"
+                ? `That's everything. When this run ends, your score goes on the ${online ? "global " : ""}leaderboard. Survive as many loops as you can. Good luck!`
+                : "That's everything. Private loops aren't ranked, so play the Daily Loop to get on the leaderboard. Good luck!",
+          },
         ],
         () => {
           if (this.game !== game) return;
