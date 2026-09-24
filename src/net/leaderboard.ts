@@ -1,10 +1,12 @@
 import { encodeInputs, decodeInputs } from "../engine/replay";
 import type { RunSummary } from "../engine/sim";
 
-// The leaderboard lives entirely in this browser: no server, no database, no keys.
+// The shared leaderboard lives in Supabase. Clients can only read it; runs are
+// submitted to the submit-run edge function, which re-simulates them to verify
+// the score. Without Supabase settings it falls back to this browser's storage.
 
 export interface LeaderboardEntry {
-  id: string;
+  id: string | null;
   name: string;
   score: number;
   loops: number;
@@ -31,10 +33,30 @@ export interface ReplayData {
   name: string;
 }
 
+// Publishable keys are meant to ship in the page: the database only allows
+// reads, and writes go through score verification. Env vars override them.
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://doaxrnvcnqkdwaubkhki.supabase.co";
+const SUPABASE_KEY = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? "sb_publishable_RHOfqqDoUkg78XUsINeAGg_YIl2N2CD";
+
+export const online = !!(SUPABASE_URL && SUPABASE_KEY);
+
+async function api(path: string, init: RequestInit = {}) {
+  const res = await fetch(`${SUPABASE_URL}${path}`, {
+    ...init,
+    headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json", ...(init.headers ?? {}) },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || data.message || `HTTP ${res.status}`);
+  return data;
+}
+
+// ---------- Local fallback (used when Supabase isn't configured) ----------
+
 const LOCAL_KEY = "echo.localRuns";
 const MAX_RUNS = 50;
 
 interface LocalRun extends LeaderboardEntry {
+  id: string;
   seed: number;
   inputs: string;
 }
@@ -77,6 +99,20 @@ export async function submitRun(
   inputs: Uint8Array,
   summary: RunSummary,
 ): Promise<SubmitResult> {
+  const encoded = encodeInputs(inputs);
+  if (online) {
+    try {
+      // The edge function re-simulates the inputs and computes the score itself.
+      const data = await api("/functions/v1/submit-run", {
+        method: "POST",
+        body: JSON.stringify({ name, day, inputs: encoded }),
+      });
+      return { ok: true, entry: data.entry, rank: data.rank, overallRank: data.overallRank };
+    } catch (err) {
+      return { ok: false, error: err instanceof TypeError ? "Could not reach the leaderboard." : String((err as Error).message) };
+    }
+  }
+
   const entry: LocalRun = {
     id: `local-${Date.now()}`,
     name,
@@ -87,7 +123,7 @@ export async function submitRun(
     day,
     created_at: new Date().toISOString(),
     seed,
-    inputs: encodeInputs(inputs),
+    inputs: encoded,
   };
   const runs = [...readLocal(), entry].sort((a, b) => b.score - a.score);
   if (!writeLocal(runs)) return { ok: false, error: "Could not save: browser storage is unavailable." };
@@ -97,11 +133,25 @@ export async function submitRun(
 }
 
 export async function fetchTop(day: string, limit = 20, scope: LeaderboardScope = "daily"): Promise<LeaderboardEntry[]> {
+  if (online) {
+    return api(
+      scope === "daily"
+        ? `/rest/v1/leaderboard?select=id,name,score,loops,orbs,max_combo,day,created_at` +
+            `&day=eq.${encodeURIComponent(day)}&order=score.desc,created_at.asc&limit=${limit}`
+        : `/rest/v1/overall_leaderboard?select=id,name,score,games_played,created_at` +
+            `&order=score.desc,created_at.asc&limit=${limit}`,
+    );
+  }
   const runs = readLocal();
   return bestPerName(scope === "daily" ? runs.filter((r) => r.day === day) : runs).slice(0, limit);
 }
 
 export async function fetchReplay(id: string): Promise<ReplayData> {
+  if (online && !id.startsWith("local-")) {
+    const [row] = await api(`/rest/v1/runs?select=seed,inputs,name&id=eq.${encodeURIComponent(id)}`);
+    if (!row) throw new Error("Replay not found");
+    return { seed: Number(row.seed), inputs: decodeInputs(row.inputs), name: row.name };
+  }
   const run = readLocal().find((r) => r.id === id);
   if (!run) throw new Error("Replay not found");
   return { seed: run.seed, inputs: decodeInputs(run.inputs), name: run.name };
