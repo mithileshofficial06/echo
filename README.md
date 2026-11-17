@@ -8,10 +8,10 @@ ECHO is a browser arcade game about surviving your own past. Each loop lasts 10 
 
 | | |
 |---|---|
-| ◆ **Collect** | Grab enough orbs before the 10-second loop ends, or you fade. The quota rises as you go. |
-| ◯ **Meet your past** | Every finished loop replays as an echo. All of them at once. Touch one and the run is over. |
-| ≋ **Sync** | Brush past an echo without touching it to build combo. Combo multiplies orb points. |
-| ✕ **Forget** | Erase your oldest echo. You earn one charge every 3 loops. |
+| **Collect** | Grab enough orbs before the 10-second loop ends, or you fade. The quota rises as you go. |
+| **Meet your past** | Every finished loop replays as an echo. All of them at once. Touch one and the run is over. |
+| **Sync** | Brush past an echo without touching it to build combo. Combo multiplies orb points. |
+| **Forget** | Erase your oldest echo. You earn one charge every 3 loops. |
 
 **Controls:** `WASD` / arrows to move, `Space` to forget, `Esc` to pause, `M` to mute.
 **Mobile:** drag anywhere to move, tap **FORGET**. Portrait screens get a rotated arena.
